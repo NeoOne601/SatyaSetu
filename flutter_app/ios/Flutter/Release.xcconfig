@@ -1,0 +1,10 @@
+#include? "Pods/Target Support Files/Pods-Runner/Pods-Runner.release.xcconfig"
+#include "Generated.xcconfig"
+
+// ARCHITECTURE: Override Pods to build ARM64 for simulator on Apple Silicon
+// Exclude only old 32-bit architectures
+EXCLUDED_ARCHS[sdk=iphonesimulator*] = i386
+EXCLUDED_ARCHS[sdk=iphoneos*] = armv7
+
+// RUST LINK: Merge with Pods linker flags - don't override!
+OTHER_LDFLAGS = $(inherited) -force_load "$(PROJECT_DIR)/Runner/librust_core.a"

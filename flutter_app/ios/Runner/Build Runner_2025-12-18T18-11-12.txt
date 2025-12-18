@@ -1,0 +1,113 @@
+
+Showing Recent Issues
+Prepare build
+PrecompileModule /Users/macuser/Library/Developer/Xcode/DerivedData/Runner-hjkrecenvvqeefcisevuvatslbxg/Build/Intermediates.noindex/ExplicitPrecompiledModules/mobile_scanner-7Y95NK2LJYFOBLF3S7IQF4M7M.scan
+    cd /
+    builtin-precompileModule /Users/macuser/Library/Developer/Xcode/DerivedData/Runner-hjkrecenvvqeefcisevuvatslbxg/Build/Intermediates.noindex/ExplicitPrecompiledModules/mobile_scanner-7Y95NK2LJYFOBLF3S7IQF4M7M.scan
+
+While building module 'mobile_scanner':
+In file included from <module-includes>:2:
+/Users/macuser/Library/Developer/Xcode/DerivedData/Runner-hjkrecenvvqeefcisevuvatslbxg/Build/Products/Debug-iphonesimulator/mobile_scanner/mobile_scanner.framework/Headers/mobile_scanner-Swift.h:330:31: warning: 'objc_ownership' only applies to Objective-C object or block pointer types; type here is 'CVPixelBufferRef _Nullable' (aka 'struct __CVBuffer *') [-Wignored-attributes]
+  330 | - (CVPixelBufferRef _Nullable __unsafe_unretained)copyPixelBuffer SWIFT_WARN_UNUSED_RESULT;
+      |                               ^
+1 warning generated.
+
+/Users/macuser/Library/Developer/Xcode/DerivedData/Runner-hjkrecenvvqeefcisevuvatslbxg/Build/Products/Debug-iphonesimulator/mobile_scanner/mobile_scanner.framework/Headers/mobile_scanner-Swift.h:330:31: 'objc_ownership' only applies to Objective-C object or block pointer types; type here is 'CVPixelBufferRef _Nullable' (aka 'struct __CVBuffer *')
+
+Prepare packages
+Build target Runner
+Run script build phase 'Run Script' will be run during every build because the option to run the script phase "Based on dependency analysis" is unchecked.
+
+Run script build phase 'Thin Binary' will be run during every build because the option to run the script phase "Based on dependency analysis" is unchecked.
+
+Ld /Users/macuser/Library/Developer/Xcode/DerivedData/Runner-hjkrecenvvqeefcisevuvatslbxg/Build/Products/Debug-iphonesimulator/Runner.app/Runner.debug.dylib normal (in target 'Runner' from project 'Runner')
+    cd /Users/macuser/Development/SatyaSetu_Internal/flutter_app/ios
+    /Volumes/Apple/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -Xlinker -reproducible -target arm64-apple-ios13.0-simulator -dynamiclib -isysroot /Volumes/Apple/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.2.sdk -O0 -L/Users/macuser/Library/Developer/Xcode/DerivedData/Runner-hjkrecenvvqeefcisevuvatslbxg/Build/Intermediates.noindex/EagerLinkingTBDs/Debug-iphonesimulator -L/Users/macuser/Library/Developer/Xcode/DerivedData/Runner-hjkrecenvvqeefcisevuvatslbxg/Build/Products/Debug-iphonesimulator -L/Users/macuser/Development/SatyaSetu_Internal/rust_core/target/universal/release -L/Volumes/Apple/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/iphonesimulator -L/Volumes/Apple/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.2.sdk/usr/lib/swift -L/Volumes/Apple/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/iphonesimulator -L/Volumes/Apple/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.2.sdk/usr/lib/swift -L/Users/macuser/Development/SatyaSetu_Internal/flutter_app/ios/Runner -F/Users/macuser/Library/Developer/Xcode/DerivedData/Runner-hjkrecenvvqeefcisevuvatslbxg/Build/Intermediates.noindex/EagerLinkingTBDs/Debug-iphonesimulator -F/Users/macuser/Library/Developer/Xcode/DerivedData/Runner-hjkrecenvvqeefcisevuvatslbxg/Build/Products/Debug-iphonesimulator -F/Users/macuser/Library/Developer/Xcode/DerivedData/Runner-hjkrecenvvqeefcisevuvatslbxg/Build/Products/Debug-iphonesimulator/GTMSessionFetcher -F/Users/macuser/Library/Developer/Xcode/DerivedData/Runner-hjkrecenvvqeefcisevuvatslbxg/Build/Products/Debug-iphonesimulator/GoogleDataTransport -F/Users/macuser/Library/Developer/Xcode/DerivedData/Runner-hjkrecenvvqeefcisevuvatslbxg/Build/Products/Debug-iphonesimulator/GoogleToolboxForMac -F/Users/macuser/Library/Developer/Xcode/DerivedData/Runner-hjkrecenvvqeefcisevuvatslbxg/Build/Products/Debug-iphonesimulator/GoogleUtilities -F/Users/macuser/Library/Developer/Xcode/DerivedData/Runner-hjkrecenvvqeefcisevuvatslbxg/Build/Products/Debug-iphonesimulator/GoogleUtilitiesComponents -F/Users/macuser/Library/Developer/Xcode/DerivedData/Runner-hjkrecenvvqeefcisevuvatslbxg/Build/Products/Debug-iphonesimulator/PromisesObjC -F/Users/macuser/Library/Developer/Xcode/DerivedData/Runner-hjkrecenvvqeefcisevuvatslbxg/Build/Products/Debug-iphonesimulator/RustCore -F/Users/macuser/Library/Developer/Xcode/DerivedData/Runner-hjkrecenvvqeefcisevuvatslbxg/Build/Products/Debug-iphonesimulator/mobile_scanner -F/Users/macuser/Library/Developer/Xcode/DerivedData/Runner-hjkrecenvvqeefcisevuvatslbxg/Build/Products/Debug-iphonesimulator/nanopb -F/Users/macuser/Library/Developer/Xcode/DerivedData/Runner-hjkrecenvvqeefcisevuvatslbxg/Build/Products/Debug-iphonesimulator/path_provider_foundation -F/Users/macuser/Development/SatyaSetu_Internal/flutter_app/ios/Pods/MLImage/Frameworks -F/Users/macuser/Development/SatyaSetu_Internal/flutter_app/ios/Pods/MLKitBarcodeScanning/Frameworks -F/Users/macuser/Development/SatyaSetu_Internal/flutter_app/ios/Pods/MLKitCommon/Frameworks -F/Users/macuser/Development/SatyaSetu_Internal/flutter_app/ios/Pods/MLKitVision/Frameworks -filelist /Users/macuser/Library/Developer/Xcode/DerivedData/Runner-hjkrecenvvqeefcisevuvatslbxg/Build/Intermediates.noindex/Runner.build/Debug-iphonesimulator/Runner.build/Objects-normal/arm64/Runner.LinkFileList -install_name @rpath/Runner.debug.dylib -Xlinker -rpath -Xlinker /usr/lib/swift -Xlinker -rpath -Xlinker @executable_path/Frameworks -Xlinker -rpath -Xlinker @loader_path/Frameworks -dead_strip -Xlinker -object_path_lto -Xlinker /Users/macuser/Library/Developer/Xcode/DerivedData/Runner-hjkrecenvvqeefcisevuvatslbxg/Build/Intermediates.noindex/Runner.build/Debug-iphonesimulator/Runner.build/Objects-normal/arm64/Runner_lto.o -rdynamic -Xlinker -no_deduplicate -Xlinker -objc_abi_version -Xlinker 2 -Xlinker -dependency_info -Xlinker /Users/macuser/Library/Developer/Xcode/DerivedData/Runner-hjkrecenvvqeefcisevuvatslbxg/Build/Intermediates.noindex/Runner.build/Debug-iphonesimulator/Runner.build/Objects-normal/arm64/Runner_dependency_info.dat -fobjc-arc -fobjc-link-runtime -L/Volumes/Apple/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/lib/swift/iphonesimulator -L/usr/lib/swift -Xlinker -add_ast_path -Xlinker /Users/macuser/Library/Developer/Xcode/DerivedData/Runner-hjkrecenvvqeefcisevuvatslbxg/Build/Intermediates.noindex/Runner.build/Debug-iphonesimulator/Runner.build/Objects-normal/arm64/Runner.swiftmodule @/Users/macuser/Library/Developer/Xcode/DerivedData/Runner-hjkrecenvvqeefcisevuvatslbxg/Build/Intermediates.noindex/Runner.build/Debug-iphonesimulator/Runner.build/Objects-normal/arm64/Runner-linker-args.resp -ObjC -lc++ -lsqlite3 -lz -framework AVFoundation -framework Accelerate -framework CoreGraphics -framework CoreImage -framework CoreMedia -framework CoreTelephony -framework CoreVideo -framework FBLPromises -framework Foundation -framework GTMSessionFetcher -framework GoogleDataTransport -framework GoogleToolboxForMac -framework GoogleUtilities -framework GoogleUtilitiesComponents -framework LocalAuthentication -framework MLImage -framework MLKitBarcodeScanning -framework MLKitCommon -framework MLKitVision -framework RustCore -framework Security -framework SystemConfiguration -framework UIKit -framework mobile_scanner -framework nanopb -framework path_provider_foundation -force_load /Users/macuser/Development/SatyaSetu_Internal/flutter_app/ios/Runner/librust_core.a -Xlinker -alias -Xlinker _main -Xlinker ___debug_main_executable_dylib_entry_point -lrust_core -framework Pods_Runner -o /Users/macuser/Library/Developer/Xcode/DerivedData/Runner-hjkrecenvvqeefcisevuvatslbxg/Build/Products/Debug-iphonesimulator/Runner.app/Runner.debug.dylib
+
+ld: framework 'Pods_Runner' not found
+clang: error: linker command failed with exit code 1 (use -v to see invocation)
+
+Framework 'Pods_Runner' not found
+
+Linker command failed with exit code 1 (use -v to see invocation)
+
+Build target path_provider_foundation-path_provider_foundation_privacy
+Build target path_provider_foundation
+Build target nanopb-nanopb_Privacy
+Build target nanopb
+Build target mobile_scanner-mobile_scanner_privacy
+Build target mobile_scanner
+Build target RustCore
+no rule to process file '/Users/macuser/Development/SatyaSetu_Internal/rust_core/src/api.rs' of type 'text' for architecture 'arm64'
+
+no rule to process file '/Users/macuser/Development/SatyaSetu_Internal/rust_core/src/bridge_generated.rs' of type 'text' for architecture 'arm64'
+
+no rule to process file '/Users/macuser/Development/SatyaSetu_Internal/rust_core/src/bridge_generated.io.rs' of type 'text' for architecture 'arm64'
+
+no rule to process file '/Users/macuser/Development/SatyaSetu_Internal/rust_core/src/crypto.rs' of type 'text' for architecture 'arm64'
+
+no rule to process file '/Users/macuser/Development/SatyaSetu_Internal/rust_core/src/domain.rs' of type 'text' for architecture 'arm64'
+
+no rule to process file '/Users/macuser/Development/SatyaSetu_Internal/rust_core/src/lib.rs' of type 'text' for architecture 'arm64'
+
+no rule to process file '/Users/macuser/Development/SatyaSetu_Internal/rust_core/src/parser.rs' of type 'text' for architecture 'arm64'
+
+no rule to process file '/Users/macuser/Development/SatyaSetu_Internal/rust_core/src/persistence.rs' of type 'text' for architecture 'arm64'
+
+no rule to process file '/Users/macuser/Development/SatyaSetu_Internal/rust_core/src/service.rs' of type 'text' for architecture 'arm64'
+
+no rule to process file '/Users/macuser/Development/SatyaSetu_Internal/rust_core/src/api.rs' of type 'text' for architecture 'x86_64'
+
+no rule to process file '/Users/macuser/Development/SatyaSetu_Internal/rust_core/src/bridge_generated.rs' of type 'text' for architecture 'x86_64'
+
+no rule to process file '/Users/macuser/Development/SatyaSetu_Internal/rust_core/src/bridge_generated.io.rs' of type 'text' for architecture 'x86_64'
+
+no rule to process file '/Users/macuser/Development/SatyaSetu_Internal/rust_core/src/crypto.rs' of type 'text' for architecture 'x86_64'
+
+no rule to process file '/Users/macuser/Development/SatyaSetu_Internal/rust_core/src/domain.rs' of type 'text' for architecture 'x86_64'
+
+no rule to process file '/Users/macuser/Development/SatyaSetu_Internal/rust_core/src/lib.rs' of type 'text' for architecture 'x86_64'
+
+no rule to process file '/Users/macuser/Development/SatyaSetu_Internal/rust_core/src/parser.rs' of type 'text' for architecture 'x86_64'
+
+no rule to process file '/Users/macuser/Development/SatyaSetu_Internal/rust_core/src/persistence.rs' of type 'text' for architecture 'x86_64'
+
+no rule to process file '/Users/macuser/Development/SatyaSetu_Internal/rust_core/src/service.rs' of type 'text' for architecture 'x86_64'
+
+Ld /Users/macuser/Library/Developer/Xcode/DerivedData/Runner-hjkrecenvvqeefcisevuvatslbxg/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/RustCore.build/Objects-normal/arm64/Binary/RustCore normal arm64 (in target 'RustCore' from project 'Pods')
+    cd /Users/macuser/Development/SatyaSetu_Internal/flutter_app/ios/Pods
+    /Volumes/Apple/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -Xlinker -reproducible -target arm64-apple-ios14.0-simulator -dynamiclib -isysroot /Volumes/Apple/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.2.sdk -O0 -L/Users/macuser/Library/Developer/Xcode/DerivedData/Runner-hjkrecenvvqeefcisevuvatslbxg/Build/Intermediates.noindex/EagerLinkingTBDs/Debug-iphonesimulator -L/Users/macuser/Library/Developer/Xcode/DerivedData/Runner-hjkrecenvvqeefcisevuvatslbxg/Build/Products/Debug-iphonesimulator/RustCore -L/Users/macuser/Development/SatyaSetu_Internal/rust_core/target/universal/release -F/Users/macuser/Library/Developer/Xcode/DerivedData/Runner-hjkrecenvvqeefcisevuvatslbxg/Build/Intermediates.noindex/EagerLinkingTBDs/Debug-iphonesimulator -F/Users/macuser/Library/Developer/Xcode/DerivedData/Runner-hjkrecenvvqeefcisevuvatslbxg/Build/Products/Debug-iphonesimulator/RustCore -filelist /Users/macuser/Library/Developer/Xcode/DerivedData/Runner-hjkrecenvvqeefcisevuvatslbxg/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/RustCore.build/Objects-normal/arm64/RustCore.LinkFileList -install_name @rpath/RustCore.framework/RustCore -Xlinker -rpath -Xlinker @executable_path/Frameworks -Xlinker -rpath -Xlinker @loader_path/Frameworks -dead_strip -Xlinker -object_path_lto -Xlinker /Users/macuser/Library/Developer/Xcode/DerivedData/Runner-hjkrecenvvqeefcisevuvatslbxg/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/RustCore.build/Objects-normal/arm64/RustCore_lto.o -rdynamic -Xlinker -no_deduplicate -Xlinker -objc_abi_version -Xlinker 2 -Xlinker -dependency_info -Xlinker /Users/macuser/Library/Developer/Xcode/DerivedData/Runner-hjkrecenvvqeefcisevuvatslbxg/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/RustCore.build/Objects-normal/arm64/RustCore_dependency_info.dat -fobjc-arc -fobjc-link-runtime -lrust_core -force_load /Users/macuser/Development/SatyaSetu_Internal/flutter_app/ios/Pods/../../../rust_core/target/universal/release/librust_core.a -framework Foundation -Xlinker -no_adhoc_codesign -compatibility_version 1 -current_version 1 -o /Users/macuser/Library/Developer/Xcode/DerivedData/Runner-hjkrecenvvqeefcisevuvatslbxg/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/RustCore.build/Objects-normal/arm64/Binary/RustCore
+
+ld: warning: object file (/Users/macuser/Development/SatyaSetu_Internal/rust_core/target/universal/release/librust_core.a[arm64][46](c877a2978823c39d-sqlite3.o)) was built for newer 'iOS-simulator' version (26.2) than being linked (14.0)
+ld: warning: object file (/Users/macuser/Development/SatyaSetu_Internal/rust_core/target/universal/release/librust_core.a[arm64][223](248f927bf32daba4-dart_api_dl.o)) was built for newer 'iOS-simulator' version (26.2) than being linked (14.0)
+
+Object file (/Users/macuser/Development/SatyaSetu_Internal/rust_core/target/universal/release/librust_core.a[arm64][46](c877a2978823c39d-sqlite3.o)) was built for newer 'iOS-simulator' version (26.2) than being linked (14.0)
+
+Object file (/Users/macuser/Development/SatyaSetu_Internal/rust_core/target/universal/release/librust_core.a[arm64][223](248f927bf32daba4-dart_api_dl.o)) was built for newer 'iOS-simulator' version (26.2) than being linked (14.0)
+
+Ld /Users/macuser/Library/Developer/Xcode/DerivedData/Runner-hjkrecenvvqeefcisevuvatslbxg/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/RustCore.build/Objects-normal/x86_64/Binary/RustCore normal x86_64 (in target 'RustCore' from project 'Pods')
+    cd /Users/macuser/Development/SatyaSetu_Internal/flutter_app/ios/Pods
+    /Volumes/Apple/Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -Xlinker -reproducible -target x86_64-apple-ios14.0-simulator -dynamiclib -isysroot /Volumes/Apple/Applications/Xcode.app/Contents/Developer/Platforms/iPhoneSimulator.platform/Developer/SDKs/iPhoneSimulator26.2.sdk -O0 -L/Users/macuser/Library/Developer/Xcode/DerivedData/Runner-hjkrecenvvqeefcisevuvatslbxg/Build/Intermediates.noindex/EagerLinkingTBDs/Debug-iphonesimulator -L/Users/macuser/Library/Developer/Xcode/DerivedData/Runner-hjkrecenvvqeefcisevuvatslbxg/Build/Products/Debug-iphonesimulator/RustCore -L/Users/macuser/Development/SatyaSetu_Internal/rust_core/target/universal/release -F/Users/macuser/Library/Developer/Xcode/DerivedData/Runner-hjkrecenvvqeefcisevuvatslbxg/Build/Intermediates.noindex/EagerLinkingTBDs/Debug-iphonesimulator -F/Users/macuser/Library/Developer/Xcode/DerivedData/Runner-hjkrecenvvqeefcisevuvatslbxg/Build/Products/Debug-iphonesimulator/RustCore -filelist /Users/macuser/Library/Developer/Xcode/DerivedData/Runner-hjkrecenvvqeefcisevuvatslbxg/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/RustCore.build/Objects-normal/x86_64/RustCore.LinkFileList -install_name @rpath/RustCore.framework/RustCore -Xlinker -rpath -Xlinker @executable_path/Frameworks -Xlinker -rpath -Xlinker @loader_path/Frameworks -dead_strip -Xlinker -object_path_lto -Xlinker /Users/macuser/Library/Developer/Xcode/DerivedData/Runner-hjkrecenvvqeefcisevuvatslbxg/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/RustCore.build/Objects-normal/x86_64/RustCore_lto.o -rdynamic -Xlinker -no_deduplicate -Xlinker -objc_abi_version -Xlinker 2 -Xlinker -dependency_info -Xlinker /Users/macuser/Library/Developer/Xcode/DerivedData/Runner-hjkrecenvvqeefcisevuvatslbxg/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/RustCore.build/Objects-normal/x86_64/RustCore_dependency_info.dat -fobjc-arc -fobjc-link-runtime -lrust_core -force_load /Users/macuser/Development/SatyaSetu_Internal/flutter_app/ios/Pods/../../../rust_core/target/universal/release/librust_core.a -framework Foundation -Xlinker -no_adhoc_codesign -compatibility_version 1 -current_version 1 -o /Users/macuser/Library/Developer/Xcode/DerivedData/Runner-hjkrecenvvqeefcisevuvatslbxg/Build/Intermediates.noindex/Pods.build/Debug-iphonesimulator/RustCore.build/Objects-normal/x86_64/Binary/RustCore
+
+ld: warning: object file (/Users/macuser/Development/SatyaSetu_Internal/rust_core/target/universal/release/librust_core.a[x86_64][46](c877a2978823c39d-sqlite3.o)) was built for newer 'iOS-simulator' version (26.2) than being linked (14.0)
+ld: warning: object file (/Users/macuser/Development/SatyaSetu_Internal/rust_core/target/universal/release/librust_core.a[x86_64][224](248f927bf32daba4-dart_api_dl.o)) was built for newer 'iOS-simulator' version (26.2) than being linked (14.0)
+
+Object file (/Users/macuser/Development/SatyaSetu_Internal/rust_core/target/universal/release/librust_core.a[x86_64][46](c877a2978823c39d-sqlite3.o)) was built for newer 'iOS-simulator' version (26.2) than being linked (14.0)
+
+Object file (/Users/macuser/Development/SatyaSetu_Internal/rust_core/target/universal/release/librust_core.a[x86_64][224](248f927bf32daba4-dart_api_dl.o)) was built for newer 'iOS-simulator' version (26.2) than being linked (14.0)
+
+Build target PromisesObjC-FBLPromises_Privacy
+Build target PromisesObjC
+Build target GoogleUtilities-GoogleUtilities_Privacy
+Build target GoogleUtilities
+Build target GoogleToolboxForMac-GoogleToolboxForMac_Privacy
+Build target GoogleToolboxForMac-GoogleToolboxForMac_Logger_Privacy
+Build target GoogleUtilitiesComponents
+Build target GoogleToolboxForMac
+Build target GoogleDataTransport-GoogleDataTransport_Privacy
+Build target GoogleDataTransport
+Build target GTMSessionFetcher-GTMSessionFetcher_Core_Privacy
+Build target GTMSessionFetcher
+
+
+Activity Log Complete    12/18/25, 6:12 PM    88.0 seconds

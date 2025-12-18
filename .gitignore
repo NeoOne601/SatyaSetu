@@ -1,0 +1,24 @@
+# Flutter
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+build/
+
+# iOS
+ios/Pods/
+ios/.symlinks/
+ios/Flutter/Generated.xcconfig
+ios/Flutter/flutter_export_environment.sh
+ios/ServiceDefinitions.json
+ios/Runner/librust_core.a
+*.xcworkspace
+!ios/Runner.xcworkspace
+
+# Rust
+rust_core/target/
+rust_core/Cargo.lock
+
+# macOS
+.DS_Store

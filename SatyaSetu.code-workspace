@@ -1,0 +1,10 @@
+{
+  "folders": [
+    { "name": "Root", "path": "." },
+    { "name": "Flutter App", "path": "flutter_app" },
+    { "name": "Rust Core", "path": "rust_core" }
+  ],
+  "settings": {
+    "rust-analyzer.linkedProjects": ["./rust_core/Cargo.toml"]
+  }
+}
