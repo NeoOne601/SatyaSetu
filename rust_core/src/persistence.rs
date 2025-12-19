@@ -1,46 +1,43 @@
-use rusqlite::{params, Connection, Result};
-use crate::domain::{SignedIntent, SatyaError};
+use serde::{Deserialize, Serialize};
+use crate::domain::SatyaIdentity;
+use crate::crypto::{VaultKey, encrypt_with_binding, decrypt_with_binding};
+use anyhow::{Result, Context};
+use std::fs;
+use std::path::PathBuf;
 
-pub struct Database;
+#[derive(Serialize, Deserialize, Default)]
+pub struct SatyaVault {
+    pub version: u32,
+    pub identities: Vec<SatyaIdentity>,
+}
 
-impl Database {
-    fn get_conn() -> Result<Connection> {
-        Connection::open("satya_ledger.db")
+pub struct VaultManager {
+    storage_path: PathBuf,
+}
+
+impl VaultManager {
+    pub fn new(base_path: &str) -> Self {
+        let mut path = PathBuf::from(base_path);
+        path.push("satya_vault/vault.bin");
+        let _ = fs::create_dir_all(path.parent().unwrap());
+        Self { storage_path: path }
     }
 
-    pub fn init() -> Result<()> {
-        let conn = Self::get_conn()?;
-        conn.execute(
-            "CREATE TABLE IF NOT EXISTS ledger (
-                id INTEGER PRIMARY KEY,
-                timestamp INTEGER,
-                interaction_type TEXT,
-                amount INTEGER,
-                counterparty TEXT,
-                signature TEXT,
-                full_json TEXT
-            )",
-            [],
-        )?;
+    pub fn atomic_save(&self, key: &VaultKey, hw_id: &[u8], vault: &SatyaVault) -> Result<()> {
+        let encoded = bincode::serialize(vault).context("Bincode failed")?;
+        let encrypted = encrypt_with_binding(key, hw_id, &encoded)?;
+
+        let tmp_path = self.storage_path.with_extension("tmp");
+        fs::write(&tmp_path, encrypted)?;
+        fs::rename(&tmp_path, &self.storage_path)?; // Atomic swap
         Ok(())
     }
 
-    pub fn save_intent(intent: &SignedIntent) -> Result<(), SatyaError> {
-        let conn = Self::get_conn().map_err(|_| SatyaError::DatabaseError)?;
-        let json = serde_json::to_string(intent).map_err(|_| SatyaError::SerializationError)?;
-        
-        conn.execute(
-            "INSERT INTO ledger (timestamp, interaction_type, amount, counterparty, signature, full_json)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-            params![
-                intent.payload.timestamp,
-                format!("{:?}", intent.payload.interaction),
-                intent.payload.amount_cents,
-                intent.payload.counterparty_did,
-                intent.signature_hex,
-                json
-            ],
-        ).map_err(|_| SatyaError::DatabaseError)?;
-        Ok(())
+    pub fn load(&self, key: &VaultKey, hw_id: &[u8]) -> Result<SatyaVault> {
+        if !self.storage_path.exists() { return Ok(SatyaVault::default()); }
+        let encrypted = fs::read(&self.storage_path)?;
+        let decrypted = decrypt_with_binding(key, hw_id, &encrypted)?;
+        let vault: SatyaVault = bincode::deserialize(&decrypted)?;
+        Ok(vault)
     }
 }

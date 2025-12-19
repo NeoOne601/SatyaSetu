@@ -5,3 +5,4 @@ pub mod service;
 pub mod parser;
 pub mod persistence;
 pub mod api;
+pub mod telemetry;
