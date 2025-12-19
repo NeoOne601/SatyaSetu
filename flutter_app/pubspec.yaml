@@ -1,22 +1,37 @@
+#Implementing the Hardware ID extraction and the Secure Unlock UI.
 name: flutter_app
-description: A new Flutter project.
+description: "SatyaSetu: Privacy-First Identity Bridge"
 publish_to: 'none'
 version: 1.0.0+1
+
 environment:
   sdk: '>=3.0.0 <4.0.0'
+
 dependencies:
   flutter:
     sdk: flutter
-  flutter_rust_bridge: ^1.82.0
+  
+  # The Rust Bridge (Synchronized with build_mobile.sh)
+  flutter_rust_bridge: ^1.82.6
   ffi: ^2.0.1
+  
+  # UI & Experience Baseline
   google_fonts: ^5.0.0
   lucide_icons: ^0.257.0
   cupertino_icons: ^1.0.2
-  mobile_scanner: ^7.1.4  # <--- QR Scanner using Apple Vision API on iOS
+  
+  # THE IOS FIX: Preserving Apple Vision API compatibility
+  mobile_scanner: ^7.1.4
+  
+  # Adding Persistence and Security: Phase 3 Infrastructure
+  path_provider: ^2.1.2
+  device_info_plus: ^10.1.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^2.0.0
   ffigen: ^8.0.0 
+
 flutter:
   uses-material-design: true

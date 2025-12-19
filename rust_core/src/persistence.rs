@@ -1,3 +1,4 @@
+// Adding Persistence and Security
 use serde::{Deserialize, Serialize};
 use crate::domain::SatyaIdentity;
 use crate::crypto::{VaultKey, encrypt_with_binding, decrypt_with_binding};
@@ -24,12 +25,12 @@ impl VaultManager {
     }
 
     pub fn atomic_save(&self, key: &VaultKey, hw_id: &[u8], vault: &SatyaVault) -> Result<()> {
-        let encoded = bincode::serialize(vault).context("Bincode failed")?;
+        let encoded = bincode::serialize(vault).context("Vault serialization failed")?;
         let encrypted = encrypt_with_binding(key, hw_id, &encoded)?;
 
         let tmp_path = self.storage_path.with_extension("tmp");
         fs::write(&tmp_path, encrypted)?;
-        fs::rename(&tmp_path, &self.storage_path)?; // Atomic swap
+        fs::rename(&tmp_path, &self.storage_path)?; // Atomic filesystem swap
         Ok(())
     }
 

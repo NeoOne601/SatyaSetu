@@ -1,3 +1,4 @@
+// Adding Persistence and Security
 use serde::Serialize;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -7,7 +8,7 @@ pub struct TelemetryEvent {
     pub timestamp: u64,
     pub action: String,
     pub status: String,
-    pub device_tag: String, // Hashed Hardware ID
+    pub device_tag: String, 
 }
 
 impl TelemetryEvent {
@@ -27,8 +28,7 @@ impl TelemetryEvent {
     }
 
     pub fn log(&self) {
-        // Principal Engineer Strategy: 
-        // In local dev, we print to stdout. In Phase 4, this broadcasts via Nostr.
+        // Principal Engineer Strategy: In dev, we log to stdout. Admin module reads this stream.
         println!("SATYA_TELEMETRY: {}", serde_json::to_string(self).unwrap_or_default());
     }
 }

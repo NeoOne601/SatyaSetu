@@ -1,24 +1,24 @@
-use crate::domain::{InteractionType};
+// Adding Persistence and Security
+use crate::domain::UpiIntent;
 use regex::Regex;
-use lazy_static::lazy_static;
+use anyhow::{Result, anyhow};
 
-lazy_static! {
-    static ref UPI_REGEX: Regex = Regex::new(r"pa=([^&]+)&pn=([^&]+)").unwrap();
-}
-
-pub struct QrParser;
-
-impl QrParser {
-    pub fn parse_upi_string(qr_raw: &str) -> Option<(String, String)> {
-        if let Some(caps) = UPI_REGEX.captures(qr_raw) {
-            let vpa = caps.get(1).map_or("", |m| m.as_str()).to_string();
-            let name = caps.get(2).map_or("", |m| m.as_str()).to_string();
-            return Some((vpa, name));
-        }
-        None
+pub fn parse_upi_url(url: &str) -> Result<UpiIntent> {
+    if !url.starts_with("upi://pay") {
+        return Err(anyhow!("Not a valid UPI URL"));
     }
 
-    pub fn determine_interaction_type(_metadata: &str) -> InteractionType {
-        InteractionType::Payment 
+    let re = Regex::new(r"pa=([^&]+)(?:&pn=([^&]+))?(?:&am=([^&]+))?(?:&cu=([^&]+))?").unwrap();
+    
+    if let Some(caps) = re.captures(url) {
+        // PRINCIPAL FIX: Explicit mapping to resolve type inference E0282
+        let vpa = caps.get(1).map(|m| m.as_str()).unwrap_or("").to_string();
+        let name = caps.get(2).map(|m| m.as_str()).unwrap_or("").to_string();
+        let amount = caps.get(3).map(|m| m.as_str()).unwrap_or("").to_string();
+        let currency = caps.get(4).map(|m| m.as_str()).unwrap_or("INR").to_string();
+
+        Ok(UpiIntent { vpa, name, amount, currency })
+    } else {
+        Err(anyhow!("Failed to parse UPI components"))
     }
 }

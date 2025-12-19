@@ -1,8 +1,11 @@
-mod bridge_generated; /* AUTO INJECTED BY flutter_rust_bridge. This line may not be accurate, and you can change it according to your needs. */
-pub mod domain;
+// Adding Persistence and Security
+pub mod api;
 pub mod crypto;
-pub mod service;
+pub mod domain;
 pub mod parser;
 pub mod persistence;
-pub mod api;
 pub mod telemetry;
+pub mod service;
+
+// The bridge_generated file is managed by flutter_rust_bridge_codegen
+mod bridge_generated;

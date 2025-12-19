@@ -15,13 +15,42 @@ abstract class RustCore {
 
   FlutterRustBridgeTaskConstMeta get kRustInitCoreConstMeta;
 
+  Future<bool> rustInitializeVault(
+      {required String pin,
+      required String hwId,
+      required String storagePath,
+      dynamic hint});
+
+  FlutterRustBridgeTaskConstMeta get kRustInitializeVaultConstMeta;
+
   Future<String> rustGenerateDidSafe({dynamic hint});
 
   FlutterRustBridgeTaskConstMeta get kRustGenerateDidSafeConstMeta;
 
+  Future<SatyaIdentity> rustCreateIdentity(
+      {required String label, dynamic hint});
+
+  FlutterRustBridgeTaskConstMeta get kRustCreateIdentityConstMeta;
+
   Future<String> rustScanQr({required String rawQrString, dynamic hint});
 
   FlutterRustBridgeTaskConstMeta get kRustScanQrConstMeta;
+
+  Future<List<SatyaIdentity>> rustGetIdentities({dynamic hint});
+
+  FlutterRustBridgeTaskConstMeta get kRustGetIdentitiesConstMeta;
+}
+
+class SatyaIdentity {
+  final String id;
+  final String label;
+  final String did;
+
+  const SatyaIdentity({
+    required this.id,
+    required this.label,
+    required this.did,
+  });
 }
 
 class RustCoreImpl implements RustCore {
@@ -50,11 +79,36 @@ class RustCoreImpl implements RustCore {
         argNames: [],
       );
 
+  Future<bool> rustInitializeVault(
+      {required String pin,
+      required String hwId,
+      required String storagePath,
+      dynamic hint}) {
+    var arg0 = _platform.api2wire_String(pin);
+    var arg1 = _platform.api2wire_String(hwId);
+    var arg2 = _platform.api2wire_String(storagePath);
+    return _platform.executeNormal(FlutterRustBridgeTask(
+      callFfi: (port_) =>
+          _platform.inner.wire_rust_initialize_vault(port_, arg0, arg1, arg2),
+      parseSuccessData: _wire2api_bool,
+      parseErrorData: _wire2api_FrbAnyhowException,
+      constMeta: kRustInitializeVaultConstMeta,
+      argValues: [pin, hwId, storagePath],
+      hint: hint,
+    ));
+  }
+
+  FlutterRustBridgeTaskConstMeta get kRustInitializeVaultConstMeta =>
+      const FlutterRustBridgeTaskConstMeta(
+        debugName: "rust_initialize_vault",
+        argNames: ["pin", "hwId", "storagePath"],
+      );
+
   Future<String> rustGenerateDidSafe({dynamic hint}) {
     return _platform.executeNormal(FlutterRustBridgeTask(
       callFfi: (port_) => _platform.inner.wire_rust_generate_did_safe(port_),
       parseSuccessData: _wire2api_String,
-      parseErrorData: null,
+      parseErrorData: _wire2api_FrbAnyhowException,
       constMeta: kRustGenerateDidSafeConstMeta,
       argValues: [],
       hint: hint,
@@ -67,12 +121,32 @@ class RustCoreImpl implements RustCore {
         argNames: [],
       );
 
+  Future<SatyaIdentity> rustCreateIdentity(
+      {required String label, dynamic hint}) {
+    var arg0 = _platform.api2wire_String(label);
+    return _platform.executeNormal(FlutterRustBridgeTask(
+      callFfi: (port_) =>
+          _platform.inner.wire_rust_create_identity(port_, arg0),
+      parseSuccessData: _wire2api_satya_identity,
+      parseErrorData: _wire2api_FrbAnyhowException,
+      constMeta: kRustCreateIdentityConstMeta,
+      argValues: [label],
+      hint: hint,
+    ));
+  }
+
+  FlutterRustBridgeTaskConstMeta get kRustCreateIdentityConstMeta =>
+      const FlutterRustBridgeTaskConstMeta(
+        debugName: "rust_create_identity",
+        argNames: ["label"],
+      );
+
   Future<String> rustScanQr({required String rawQrString, dynamic hint}) {
     var arg0 = _platform.api2wire_String(rawQrString);
     return _platform.executeNormal(FlutterRustBridgeTask(
       callFfi: (port_) => _platform.inner.wire_rust_scan_qr(port_, arg0),
       parseSuccessData: _wire2api_String,
-      parseErrorData: null,
+      parseErrorData: _wire2api_FrbAnyhowException,
       constMeta: kRustScanQrConstMeta,
       argValues: [rawQrString],
       hint: hint,
@@ -85,13 +159,53 @@ class RustCoreImpl implements RustCore {
         argNames: ["rawQrString"],
       );
 
+  Future<List<SatyaIdentity>> rustGetIdentities({dynamic hint}) {
+    return _platform.executeNormal(FlutterRustBridgeTask(
+      callFfi: (port_) => _platform.inner.wire_rust_get_identities(port_),
+      parseSuccessData: _wire2api_list_satya_identity,
+      parseErrorData: _wire2api_FrbAnyhowException,
+      constMeta: kRustGetIdentitiesConstMeta,
+      argValues: [],
+      hint: hint,
+    ));
+  }
+
+  FlutterRustBridgeTaskConstMeta get kRustGetIdentitiesConstMeta =>
+      const FlutterRustBridgeTaskConstMeta(
+        debugName: "rust_get_identities",
+        argNames: [],
+      );
+
   void dispose() {
     _platform.dispose();
   }
 // Section: wire2api
 
+  FrbAnyhowException _wire2api_FrbAnyhowException(dynamic raw) {
+    return FrbAnyhowException(raw as String);
+  }
+
   String _wire2api_String(dynamic raw) {
     return raw as String;
+  }
+
+  bool _wire2api_bool(dynamic raw) {
+    return raw as bool;
+  }
+
+  List<SatyaIdentity> _wire2api_list_satya_identity(dynamic raw) {
+    return (raw as List<dynamic>).map(_wire2api_satya_identity).toList();
+  }
+
+  SatyaIdentity _wire2api_satya_identity(dynamic raw) {
+    final arr = raw as List<dynamic>;
+    if (arr.length != 3)
+      throw Exception('unexpected arr length: expect 3 but see ${arr.length}');
+    return SatyaIdentity(
+      id: _wire2api_String(arr[0]),
+      label: _wire2api_String(arr[1]),
+      did: _wire2api_String(arr[2]),
+    );
   }
 
   int _wire2api_u8(dynamic raw) {
@@ -224,6 +338,32 @@ class RustCoreWire implements FlutterRustBridgeWireBase {
   late final _wire_rust_init_core =
       _wire_rust_init_corePtr.asFunction<void Function(int)>();
 
+  void wire_rust_initialize_vault(
+    int port_,
+    ffi.Pointer<wire_uint_8_list> pin,
+    ffi.Pointer<wire_uint_8_list> hw_id,
+    ffi.Pointer<wire_uint_8_list> storage_path,
+  ) {
+    return _wire_rust_initialize_vault(port_, pin, hw_id, storage_path);
+  }
+
+  late final _wire_rust_initialize_vaultPtr = _lookup<
+      ffi.NativeFunction<
+          ffi.Void Function(
+            ffi.Int64,
+            ffi.Pointer<wire_uint_8_list>,
+            ffi.Pointer<wire_uint_8_list>,
+            ffi.Pointer<wire_uint_8_list>,
+          )>>('wire_rust_initialize_vault');
+  late final _wire_rust_initialize_vault =
+      _wire_rust_initialize_vaultPtr.asFunction<
+          void Function(
+            int,
+            ffi.Pointer<wire_uint_8_list>,
+            ffi.Pointer<wire_uint_8_list>,
+            ffi.Pointer<wire_uint_8_list>,
+          )>();
+
   void wire_rust_generate_did_safe(int port_) {
     return _wire_rust_generate_did_safe(port_);
   }
@@ -234,6 +374,20 @@ class RustCoreWire implements FlutterRustBridgeWireBase {
   );
   late final _wire_rust_generate_did_safe =
       _wire_rust_generate_did_safePtr.asFunction<void Function(int)>();
+
+  void wire_rust_create_identity(
+    int port_,
+    ffi.Pointer<wire_uint_8_list> label,
+  ) {
+    return _wire_rust_create_identity(port_, label);
+  }
+
+  late final _wire_rust_create_identityPtr = _lookup<
+      ffi.NativeFunction<
+          ffi.Void Function(ffi.Int64,
+              ffi.Pointer<wire_uint_8_list>)>>('wire_rust_create_identity');
+  late final _wire_rust_create_identity = _wire_rust_create_identityPtr
+      .asFunction<void Function(int, ffi.Pointer<wire_uint_8_list>)>();
 
   void wire_rust_scan_qr(
     int port_,
@@ -248,6 +402,17 @@ class RustCoreWire implements FlutterRustBridgeWireBase {
               ffi.Int64, ffi.Pointer<wire_uint_8_list>)>>('wire_rust_scan_qr');
   late final _wire_rust_scan_qr = _wire_rust_scan_qrPtr
       .asFunction<void Function(int, ffi.Pointer<wire_uint_8_list>)>();
+
+  void wire_rust_get_identities(int port_) {
+    return _wire_rust_get_identities(port_);
+  }
+
+  late final _wire_rust_get_identitiesPtr =
+      _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Int64)>>(
+    'wire_rust_get_identities',
+  );
+  late final _wire_rust_get_identities =
+      _wire_rust_get_identitiesPtr.asFunction<void Function(int)>();
 
   ffi.Pointer<wire_uint_8_list> new_uint_8_list_0(int len) {
     return _new_uint_8_list_0(len);
@@ -285,5 +450,3 @@ typedef DartPostCObjectFnType = ffi.Pointer<
     ffi.NativeFunction<
         ffi.Bool Function(DartPort port_id, ffi.Pointer<ffi.Void> message)>>;
 typedef DartPort = ffi.Int64;
-
-const int DEFAULT_S2_LEVEL = 12;
