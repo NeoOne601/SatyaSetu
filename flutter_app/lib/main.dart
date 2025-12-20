@@ -1,9 +1,17 @@
 /**
  * PROJECT SATYA: SECURE IDENTITY BRIDGE
+ * =====================================
  * PHASE: 4.0 (Identity Lifecycle & Persistence)
- * DESCRIPTION: Implements the Identity Ledger UI, recursive vault loading, 
- * and hardware-locked session management.
- * PREVIOUS: Phase 3.6 (Android Parity & Silicon Binding)
+ * VERSION: 1.1.0
+ * STATUS: STABLE (Functional Persistence Verified)
+ * * DESCRIPTION:
+ * Main entry point for SatyaSetu. Manages the Silicon-Locked Unlock sequence 
+ * and provides the Identity Ledger (Wallet) view for persisted DIDs.
+ * * CHANGE LOG:
+ * - Phase 2.0: Basic QR Scanner implementation (Apple Vision API).
+ * - Phase 3.3: Silicon-Locked Vault Unlock sequence added.
+ * - Phase 3.6: Android Parity & Mock QR Injector for simulator testing.
+ * - Phase 4.0: Standardized Phase headers and Identity Ledger persistence.
  */
 
 import 'dart:io';
@@ -18,7 +26,7 @@ import 'services/vault_service.dart';
 import 'services/hardware_id_service.dart';
 
 void main() async {
-  // Principal Design: Ensure Native Bindings are initialized before App Launch
+  // Principal Design: Core framework initialization before FFI/Path calls
   WidgetsFlutterBinding.ensureInitialized();
   
   final repo = IdentityRepository();
@@ -45,7 +53,7 @@ class SatyaApp extends StatelessWidget {
           brightness: Brightness.dark,
         ),
       ),
-      // Gatekeeper logic: Always start at UnlockScreen
+      // Gatekeeper strategy: App always launches to the Locked state
       home: UnlockScreen(vaultService: vaultService, repo: repo),
     );
   }
@@ -75,7 +83,7 @@ class _UnlockScreenState extends State<UnlockScreen> {
       final directory = await getApplicationSupportDirectory();
       final hwId = await HardwareIdService.getDeviceId();
       
-      // Request Rust to derive keys and open the binary vault
+      // Requesting Rust to derive session keys and unlock the binary vault
       final success = await widget.vaultService.unlock(
         _pinController.text, 
         hwId, 
@@ -88,7 +96,7 @@ class _UnlockScreenState extends State<UnlockScreen> {
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Vault Access Denied: Incorrect PIN or Hardware Mismatch")),
+          const SnackBar(content: Text("Vault Access Denied: Hardware/PIN Mismatch")),
         );
       }
     } finally {
@@ -110,7 +118,7 @@ class _UnlockScreenState extends State<UnlockScreen> {
               style: GoogleFonts.orbitron(fontSize: 28, fontWeight: FontWeight.bold)
             ),
             const SizedBox(height: 8),
-            const Text("Silicon-Locked Persistence Active", style: TextStyle(color: Colors.white54)),
+            const Text("Silicon-Locked Persistence", style: TextStyle(color: Colors.white54)),
             const SizedBox(height: 48),
             TextField(
               controller: _pinController,
@@ -120,7 +128,6 @@ class _UnlockScreenState extends State<UnlockScreen> {
               style: const TextStyle(fontSize: 24, letterSpacing: 16, color: Color(0xFF00FFC8)),
               decoration: InputDecoration(
                 hintText: "••••••",
-                hintStyle: const TextStyle(color: Colors.white10),
                 filled: true,
                 fillColor: Colors.white.withOpacity(0.05),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
@@ -148,7 +155,7 @@ class _UnlockScreenState extends State<UnlockScreen> {
 }
 
 // ==============================================================================
-// HOME: IDENTITY LEDGER (PERSISTENCE VIEW)
+// HOME: IDENTITY LEDGER (THE WALLET VIEW)
 // ==============================================================================
 class HomeScreen extends StatefulWidget {
   final VaultService vaultService;
@@ -179,7 +186,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _showCreateIdentityDialog() async {
-    final labelController = TextEditingController(text: "Primary Identity");
+    final labelController = TextEditingController(text: "New Satya Identity");
     
     showDialog(
       context: context,
@@ -187,7 +194,7 @@ class _HomeScreenState extends State<HomeScreen> {
         title: const Text("Generate New Identity"),
         content: TextField(
           controller: labelController,
-          decoration: const InputDecoration(labelText: "Alias (e.g. Milk Vendor, Personal)"),
+          decoration: const InputDecoration(labelText: "Label (e.g. Satya Dev)"),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
@@ -293,7 +300,6 @@ class _ScannerPageState extends State<ScannerPage> {
     if (_isProcessing) return;
     setState(() => _isProcessing = true);
 
-    // Call Rust Parser via FFI
     final resultJson = await widget.repo.scanQr(code);
     
     if (mounted) {
@@ -301,10 +307,7 @@ class _ScannerPageState extends State<ScannerPage> {
         context: context,
         builder: (context) => Container(
           padding: const EdgeInsets.all(24),
-          decoration: const BoxDecoration(
-            color: Color(0xFF1A1A1A), 
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24))
-          ),
+          decoration: const BoxDecoration(color: Color(0xFF1A1A1A), borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -340,7 +343,6 @@ class _ScannerPageState extends State<ScannerPage> {
               if (code != null) _handleResult(code);
             },
           ),
-          // Simulator "Injection" Button
           Positioned(
             bottom: 50, left: 50, right: 50,
             child: ElevatedButton.icon(

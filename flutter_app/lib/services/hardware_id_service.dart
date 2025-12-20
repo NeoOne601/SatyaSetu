@@ -1,10 +1,20 @@
-// Adding Persistence and Security
+/**
+ * PROJECT SATYA: SECURE IDENTITY BRIDGE
+ * =====================================
+ * PHASE: 4.0 (Identity Lifecycle & Persistence)
+ * VERSION: 1.1.0
+ * STATUS: STABLE
+ * * DESCRIPTION:
+ * Fetches unique hardware signatures to use as Additional Authenticated 
+ * Data (AAD) for binary vault encryption, preventing file transfer attacks.
+ * * CHANGE LOG:
+ * - Phase 3.3: Initial Silicon ID extraction (iOS vendor / Android ID).
+ * - Phase 4.0: Standardized Phase headers and error state fallbacks.
+ */
+
 import 'dart:io';
 import 'package:device_info_plus/device_info_plus.dart';
 
-/// PRINCIPAL DESIGN: Silicon Identity Provider
-/// Fetches a unique hardware signature to use as AAD (Additional Authenticated Data)
-/// for the Rust XChaCha20-Poly1305 encryption.
 class HardwareIdService {
   static Future<String> getDeviceId() async {
     final deviceInfo = DeviceInfoPlugin();
@@ -12,16 +22,16 @@ class HardwareIdService {
     try {
       if (Platform.isIOS) {
         final iosInfo = await deviceInfo.iosInfo;
-        // identifierForVendor is stable and persistent on iOS
+        // identifierForVendor is stable across app reinstalls
         return iosInfo.identifierForVendor ?? "ios_dev_fallback"; 
       } else if (Platform.isAndroid) {
         final androidInfo = await deviceInfo.androidInfo;
         return androidInfo.id; 
       }
     } catch (e) {
-      print("SATYA_SECURITY_WARN: Hardware ID fetch failed, using fallback: $e");
+      print("SATYA_SECURITY_WARN: Silicon Binding fallback active: $e");
     }
     
-    return "satya_default_dev_id";
+    return "satya_unbound_dev_id";
   }
 }

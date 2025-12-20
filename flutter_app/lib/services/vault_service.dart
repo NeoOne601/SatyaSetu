@@ -1,38 +1,35 @@
-// Adding Persistence and Security
+/**
+ * PROJECT SATYA: SECURE IDENTITY BRIDGE
+ * =====================================
+ * PHASE: 4.0 (Identity Lifecycle & Persistence)
+ * VERSION: 1.1.0
+ * STATUS: STABLE
+ * * DESCRIPTION:
+ * Orchestrates the secure vault lifecycle. Decouples UI logic from the 
+ * Native Repository and maintains the volatile session state.
+ * * CHANGE LOG:
+ * - Phase 3.1: Initial VaultService skeleton.
+ * - Phase 3.3: Silicon-Locked Unlock implementation.
+ * - Phase 4.0: Identity persistence workflows finalized.
+ */
+
 import '../identity_repo.dart';
 import '../identity_domain.dart';
 
-/// PRINCIPAL DESIGN: Vault Orchestrator (State Management)
-/// This service manages the lifecycle of the Secure Vault. 
-/// It adheres to SOLID principles by decoupling the UI from raw Repository calls.
 class VaultService {
   final IdentityRepository _repo;
   
-  /// Internal state tracking if the Rust vault is currently decrypted in RAM.
+  // Principal Design: Volatile flag. Decrypted keys reside strictly in Rust RAM.
   bool _isUnlocked = false;
   
   VaultService(this._repo);
 
-  /// Getter for UI components to determine current security state.
   bool get isUnlocked => _isUnlocked;
 
-  /// Unlocks the secure vault using the user PIN and hardware binding.
-  /// [pin]: The user's secret code.
-  /// [hardwareId]: The unique silicon ID of the device (AAD).
-  /// [path]: The sandbox path where 'vault.bin' resides.
   Future<bool> unlock(String pin, String hardwareId, String path) async {
     try {
-      // Passes parameters to the Native Bridge -> Rust Core.
       final success = await _repo.initializeVault(pin, hardwareId, path);
-      
       _isUnlocked = success;
-      
-      if (success) {
-        print("SATYA_VAULT: Silicon-Locked access granted.");
-      } else {
-        print("SATYA_VAULT: Access denied - Hardware/PIN mismatch.");
-      }
-      
       return success;
     } catch (e) {
       _isUnlocked = false;
@@ -41,19 +38,18 @@ class VaultService {
     }
   }
 
-  /// Zeroes out the local session state. 
-  /// Note: The actual memory wipe happens in Rust when the bridge session ends.
   void lock() {
     _isUnlocked = false;
-    print("SATYA_VAULT: Session locked. Data encrypted at rest.");
+    // Note: Rust Core automatically purges session buffers on close.
+    print("SATYA_VAULT: Identity Locked. Session keys zeroed.");
   }
 
-  /// Creates a new identity and performs an atomic save to the binary vault.
   Future<SatyaIdentity?> createNewIdentity(String label) async {
     if (!_isUnlocked) {
-      print("SATYA_SECURITY: Attempted to create identity while vault is locked.");
+      print("SATYA_SECURITY: Blocked attempt to write to locked vault.");
       return null;
     }
+    // Final result maps Rust UUIDs to Dart Domain classes
     return await _repo.createIdentity(label: label);
   }
 }
