@@ -1,7 +1,13 @@
-// Adding Persistence and Security
+/**
+ * PROJECT SATYA: SECURE IDENTITY BRIDGE
+ * PHASE: 4.0 (Identity Lifecycle & Persistence)
+ * DESCRIPTION: FFI Bridge Implementation with explicit namespacing.
+ * PREVIOUS: Phase 3.3 (Secure FFI Bridge)
+ */
+
 import 'identity_domain.dart';
 import 'identity_repo.dart';
-// FIX: Using 'as bridge' prefix to prevent collision with our manual SatyaIdentity class
+// PRINCIPAL FIX: Using prefix 'bridge' to prevent namespace collision with local SatyaIdentity
 import 'bridge_generated.dart' as bridge;
 import 'dart:ffi';
 import 'dart:io';
@@ -23,24 +29,10 @@ class IOSLoader implements RustLoaderStrategy {
   DynamicLibrary loadLibrary() => DynamicLibrary.process();
 }
 
-class MacOSLoader implements RustLoaderStrategy {
-  @override
-  DynamicLibrary loadLibrary() {
-    try {
-      final path = '${File(Platform.resolvedExecutable).parent.path}/../Frameworks/librust_core.dylib';
-      return DynamicLibrary.open(path);
-    } catch (e) {
-      print("⚠️ MacOS Bundle fail. Falling back to external drive path...");
-      return DynamicLibrary.open('/Volumes/Apple/Development/SatyaSetu_Monorepo/rust_core/target/debug/librust_core.dylib');
-    }
-  }
-}
-
 class RustLoaderFactory {
   static RustLoaderStrategy getStrategy() {
     if (Platform.isAndroid) return AndroidLoader();
     if (Platform.isIOS) return IOSLoader();
-    if (Platform.isMacOS) return MacOSLoader();
     throw UnsupportedError('Platform not supported for Native Rust Loader');
   }
 }
@@ -76,10 +68,8 @@ class IdentityRepoNative implements IdentityRepository {
   @override
   Future<SatyaIdentity> createIdentity({String label = "Primary"}) async {
     try {
-      // 1. Call Rust (returns bridge.SatyaIdentity)
+      // Mapping Rust Bridge Struct to Flutter Domain Class
       final result = await api.rustCreateIdentity(label: label);
-      
-      // 2. Map to local Domain (returns SatyaIdentity)
       return SatyaIdentity(
         id: result.id,
         label: result.label,
