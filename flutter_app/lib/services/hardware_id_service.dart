@@ -4,11 +4,11 @@
  * PHASE: 4.0 (Identity Lifecycle & Persistence)
  * VERSION: 1.1.0
  * STATUS: STABLE
- * * DESCRIPTION:
+ * DESCRIPTION:
  * Fetches unique hardware signatures to use as Additional Authenticated 
- * Data (AAD) for binary vault encryption, preventing file transfer attacks.
- * * CHANGE LOG:
- * - Phase 3.3: Initial Silicon ID extraction (iOS vendor / Android ID).
+ * Data (AAD) for binary vault encryption.
+ * CHANGE LOG:
+ * - Phase 3.3: Initial Silicon ID extraction logic.
  * - Phase 4.0: Standardized Phase headers and error state fallbacks.
  */
 
@@ -22,7 +22,6 @@ class HardwareIdService {
     try {
       if (Platform.isIOS) {
         final iosInfo = await deviceInfo.iosInfo;
-        // identifierForVendor is stable across app reinstalls
         return iosInfo.identifierForVendor ?? "ios_dev_fallback"; 
       } else if (Platform.isAndroid) {
         final androidInfo = await deviceInfo.androidInfo;
@@ -32,6 +31,6 @@ class HardwareIdService {
       print("SATYA_SECURITY_WARN: Silicon Binding fallback active: $e");
     }
     
-    return "satya_unbound_dev_id";
+    return "satya_generic_dev_id";
   }
 }

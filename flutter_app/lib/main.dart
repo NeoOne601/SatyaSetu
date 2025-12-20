@@ -3,15 +3,15 @@
  * =====================================
  * PHASE: 4.0 (Identity Lifecycle & Persistence)
  * VERSION: 1.1.0
- * STATUS: STABLE (Functional Persistence Verified)
- * * DESCRIPTION:
- * Main entry point for SatyaSetu. Manages the Silicon-Locked Unlock sequence 
- * and provides the Identity Ledger (Wallet) view for persisted DIDs.
- * * CHANGE LOG:
- * - Phase 2.0: Basic QR Scanner implementation (Apple Vision API).
- * - Phase 3.3: Silicon-Locked Vault Unlock sequence added.
- * - Phase 3.6: Android Parity & Mock QR Injector for simulator testing.
- * - Phase 4.0: Standardized Phase headers and Identity Ledger persistence.
+ * STATUS: STABLE
+ * DESCRIPTION:
+ * Main entry point for SatyaSetu. Orchestrates the Silicon-Locked Unlock 
+ * sequence and provides the Identity Ledger view for persistent DIDs.
+ * CHANGE LOG:
+ * - Phase 2.0: Basic QR Scanner implementation.
+ * - Phase 3.3: Vault Unlock sequence added.
+ * - Phase 3.6: Mock Injector added for simulator testing.
+ * - Phase 4.0: Standardized headers and Identity Ledger persistence verified.
  */
 
 import 'dart:io';
@@ -26,7 +26,6 @@ import 'services/vault_service.dart';
 import 'services/hardware_id_service.dart';
 
 void main() async {
-  // Principal Design: Core framework initialization before FFI/Path calls
   WidgetsFlutterBinding.ensureInitialized();
   
   final repo = IdentityRepository();
@@ -38,7 +37,6 @@ void main() async {
 class SatyaApp extends StatelessWidget {
   final VaultService vaultService;
   final IdentityRepository repo;
-  
   const SatyaApp({super.key, required this.vaultService, required this.repo});
 
   @override
@@ -53,7 +51,6 @@ class SatyaApp extends StatelessWidget {
           brightness: Brightness.dark,
         ),
       ),
-      // Gatekeeper strategy: App always launches to the Locked state
       home: UnlockScreen(vaultService: vaultService, repo: repo),
     );
   }
@@ -83,7 +80,6 @@ class _UnlockScreenState extends State<UnlockScreen> {
       final directory = await getApplicationSupportDirectory();
       final hwId = await HardwareIdService.getDeviceId();
       
-      // Requesting Rust to derive session keys and unlock the binary vault
       final success = await widget.vaultService.unlock(
         _pinController.text, 
         hwId, 
@@ -155,7 +151,7 @@ class _UnlockScreenState extends State<UnlockScreen> {
 }
 
 // ==============================================================================
-// HOME: IDENTITY LEDGER (THE WALLET VIEW)
+// HOME: IDENTITY LEDGER (PERSISTENCE VIEW)
 // ==============================================================================
 class HomeScreen extends StatefulWidget {
   final VaultService vaultService;
@@ -186,7 +182,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _showCreateIdentityDialog() async {
-    final labelController = TextEditingController(text: "New Satya Identity");
+    final labelController = TextEditingController(text: "Satya Primary");
     
     showDialog(
       context: context,
@@ -194,7 +190,7 @@ class _HomeScreenState extends State<HomeScreen> {
         title: const Text("Generate New Identity"),
         content: TextField(
           controller: labelController,
-          decoration: const InputDecoration(labelText: "Label (e.g. Satya Dev)"),
+          decoration: const InputDecoration(labelText: "Alias (e.g. Satya Dev)"),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
@@ -282,9 +278,6 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-// ==============================================================================
-// SCANNER: VAMPIRE MODE (SIMULATOR & PARITY COMPATIBLE)
-// ==============================================================================
 class ScannerPage extends StatefulWidget {
   final IdentityRepository repo;
   const ScannerPage({super.key, required this.repo});

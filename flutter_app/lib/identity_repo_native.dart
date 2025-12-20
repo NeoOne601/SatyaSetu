@@ -4,25 +4,21 @@
  * PHASE: 4.0 (Identity Lifecycle & Persistence)
  * VERSION: 1.1.0
  * STATUS: STABLE (Silicon-Locked)
- * * DESCRIPTION:
+ * DESCRIPTION:
  * Implements the FFI bridge between Flutter and the Rust Core. 
  * Maps native Rust structs into local Dart Domain models using namespacing.
- * * CHANGE LOG:
+ * CHANGE LOG:
  * - Phase 3.3: Initial Secure FFI implementation.
  * - Phase 3.6: Android Parity Sync (JNI linking verified).
- * - Phase 4.0: Standardized Documentation headers and model mapping.
+ * - Phase 4.0: Standardized headers and namespace-collision fix (SatyaIdentity).
  */
 
 import 'identity_domain.dart';
 import 'identity_repo.dart';
-// PRINCIPAL FIX: Namespace 'bridge' prevents collisions with local domain classes
 import 'bridge_generated.dart' as bridge;
 import 'dart:ffi';
 import 'dart:io';
 
-// ==============================================================================
-// STRATEGY PATTERN: PLATFORM LOADING
-// ==============================================================================
 abstract class RustLoaderStrategy {
   DynamicLibrary loadLibrary();
 }
@@ -45,9 +41,6 @@ class RustLoaderFactory {
   }
 }
 
-// ==============================================================================
-// REPOSITORY IMPLEMENTATION
-// ==============================================================================
 class IdentityRepoNative implements IdentityRepository {
   static bridge.RustCoreImpl? _apiInstance;
 
@@ -68,7 +61,7 @@ class IdentityRepoNative implements IdentityRepository {
         storagePath: path,
       );
     } catch (e) {
-      print("SATYA_FFI_ERROR: Vault initialization failure: $e");
+      print("SATYA_FFI_ERROR: Vault initialization failed: $e");
       return false;
     }
   }
@@ -76,7 +69,6 @@ class IdentityRepoNative implements IdentityRepository {
   @override
   Future<SatyaIdentity> createIdentity({String label = "Primary"}) async {
     try {
-      // PRINCIPAL DESIGN: Mapping Bridge Struct to local Domain Class
       final result = await api.rustCreateIdentity(label: label);
       return SatyaIdentity(
         id: result.id,
@@ -84,7 +76,7 @@ class IdentityRepoNative implements IdentityRepository {
         did: result.did,
       );
     } catch (e) {
-      print("SATYA_FFI_ERROR: Identity generation failure: $e");
+      print("SATYA_FFI_ERROR: Identity creation failure: $e");
       return SatyaIdentity(id: "error", label: "Error", did: "did:error:$e");
     }
   }
@@ -99,7 +91,7 @@ class IdentityRepoNative implements IdentityRepository {
         did: r.did
       )).toList();
     } catch (e) {
-      print("SATYA_FFI_ERROR: Ledger synchronization failed: $e");
+      print("SATYA_FFI_ERROR: Could not synchronize ledger: $e");
       return [];
     }
   }
