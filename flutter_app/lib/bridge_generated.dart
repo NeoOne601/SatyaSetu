@@ -28,6 +28,12 @@ abstract class RustCore {
 
   FlutterRustBridgeTaskConstMeta get kRustCreateIdentityConstMeta;
 
+  /// Signs a scanned UPI intent using a specific identity's private key
+  Future<String> rustSignIntent(
+      {required String identityId, required String upiUrl, dynamic hint});
+
+  FlutterRustBridgeTaskConstMeta get kRustSignIntentConstMeta;
+
   Future<List<SatyaIdentity>> rustGetIdentities({dynamic hint});
 
   FlutterRustBridgeTaskConstMeta get kRustGetIdentitiesConstMeta;
@@ -123,6 +129,27 @@ class RustCoreImpl implements RustCore {
       const FlutterRustBridgeTaskConstMeta(
         debugName: "rust_create_identity",
         argNames: ["label"],
+      );
+
+  Future<String> rustSignIntent(
+      {required String identityId, required String upiUrl, dynamic hint}) {
+    var arg0 = _platform.api2wire_String(identityId);
+    var arg1 = _platform.api2wire_String(upiUrl);
+    return _platform.executeNormal(FlutterRustBridgeTask(
+      callFfi: (port_) =>
+          _platform.inner.wire_rust_sign_intent(port_, arg0, arg1),
+      parseSuccessData: _wire2api_String,
+      parseErrorData: _wire2api_FrbAnyhowException,
+      constMeta: kRustSignIntentConstMeta,
+      argValues: [identityId, upiUrl],
+      hint: hint,
+    ));
+  }
+
+  FlutterRustBridgeTaskConstMeta get kRustSignIntentConstMeta =>
+      const FlutterRustBridgeTaskConstMeta(
+        debugName: "rust_sign_intent",
+        argNames: ["identityId", "upiUrl"],
       );
 
   Future<List<SatyaIdentity>> rustGetIdentities({dynamic hint}) {
@@ -361,6 +388,28 @@ class RustCoreWire implements FlutterRustBridgeWireBase {
               ffi.Pointer<wire_uint_8_list>)>>('wire_rust_create_identity');
   late final _wire_rust_create_identity = _wire_rust_create_identityPtr
       .asFunction<void Function(int, ffi.Pointer<wire_uint_8_list>)>();
+
+  void wire_rust_sign_intent(
+    int port_,
+    ffi.Pointer<wire_uint_8_list> identity_id,
+    ffi.Pointer<wire_uint_8_list> upi_url,
+  ) {
+    return _wire_rust_sign_intent(port_, identity_id, upi_url);
+  }
+
+  late final _wire_rust_sign_intentPtr = _lookup<
+      ffi.NativeFunction<
+          ffi.Void Function(
+            ffi.Int64,
+            ffi.Pointer<wire_uint_8_list>,
+            ffi.Pointer<wire_uint_8_list>,
+          )>>('wire_rust_sign_intent');
+  late final _wire_rust_sign_intent = _wire_rust_sign_intentPtr.asFunction<
+      void Function(
+        int,
+        ffi.Pointer<wire_uint_8_list>,
+        ffi.Pointer<wire_uint_8_list>,
+      )>();
 
   void wire_rust_get_identities(int port_) {
     return _wire_rust_get_identities(port_);

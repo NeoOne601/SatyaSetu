@@ -1,16 +1,15 @@
 /**
  * PROJECT SATYA: SECURE IDENTITY BRIDGE
  * =====================================
- * PHASE: 4.0 (Identity Lifecycle & Persistence)
- * VERSION: 1.1.0
+ * PHASE: 5.0 (The Signed Interaction)
+ * VERSION: 1.2.2
  * STATUS: STABLE
  * DESCRIPTION:
- * Orchestrates the secure vault lifecycle. Decouples UI logic from the 
- * Native Repository and maintains the volatile session state.
+ * Orchestrates the secure vault lifecycle. Decouples UI from the 
+ * Repository and maintains volatile session state.
  * CHANGE LOG:
- * - Phase 3.1: Initial VaultService skeleton.
- * - Phase 3.3: Silicon-Locked Unlock implementation.
- * - Phase 4.0: Identity persistence workflows finalized and documented.
+ * - Phase 4.0: Identity persistence workflows finalized.
+ * - Phase 5.0: Standardized Phase headers.
  */
 
 import '../identity_repo.dart';
@@ -31,21 +30,16 @@ class VaultService {
       return success;
     } catch (e) {
       _isUnlocked = false;
-      print("SATYA_VAULT_ERROR: Security breach or init failure: $e");
       return false;
     }
   }
 
   void lock() {
     _isUnlocked = false;
-    print("SATYA_VAULT: Identity Locked. Session memory zeroed.");
   }
 
   Future<SatyaIdentity?> createNewIdentity(String label) async {
-    if (!_isUnlocked) {
-      print("SATYA_SECURITY: Blocked write attempt to locked vault.");
-      return null;
-    }
+    if (!_isUnlocked) return null;
     return await _repo.createIdentity(label: label);
   }
 }

@@ -22,6 +22,15 @@ pub extern "C" fn wire_rust_create_identity(port_: i64, label: *mut wire_uint_8_
 }
 
 #[no_mangle]
+pub extern "C" fn wire_rust_sign_intent(
+    port_: i64,
+    identity_id: *mut wire_uint_8_list,
+    upi_url: *mut wire_uint_8_list,
+) {
+    wire_rust_sign_intent_impl(port_, identity_id, upi_url)
+}
+
+#[no_mangle]
 pub extern "C" fn wire_rust_get_identities(port_: i64) {
     wire_rust_get_identities_impl(port_)
 }

@@ -1,18 +1,20 @@
 /**
  * PROJECT SATYA: RUST CORE ENGINE
  * ===============================
- * PHASE: 4.0 (Identity Lifecycle & Persistence)
- * VERSION: 1.1.0
- * STATUS: STABLE
+ * PHASE: 5.0 (The Signed Interaction)
+ * VERSION: 1.2.0
+ * STATUS: STABLE (Secret Storage Active)
  * DESCRIPTION:
- * Manages atomic binary file operations for the secure vault.
- * Implements "Write-Rename" pattern to ensure zero-corruption.
+ * Manages atomic binary file operations. Implements the storage schema 
+ * for both identity metadata and secret material (Ed25519 private keys).
  * CHANGE LOG:
- * - Phase 3.2: Initial VaultManager with bincode support.
+ * - Phase 3.2: Initial VaultManager using bincode.
  * - Phase 4.0: Standardized Phase headers.
+ * - Phase 5.0: Secret Material storage (HashMap) implemented.
  */
 
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use crate::domain::SatyaIdentity;
 use crate::crypto::{VaultKey, encrypt_with_binding, decrypt_with_binding};
 use anyhow::{Result, Context};
@@ -23,6 +25,8 @@ use std::path::PathBuf;
 pub struct SatyaVault {
     pub version: u32,
     pub identities: Vec<SatyaIdentity>,
+    /// Secure map of Identity UUID -> Private Signing Key
+    pub private_keys: HashMap<String, Vec<u8>>,
 }
 
 pub struct VaultManager {
@@ -40,8 +44,6 @@ impl VaultManager {
     pub fn atomic_save(&self, key: &VaultKey, hw_id: &[u8], vault: &SatyaVault) -> Result<()> {
         let encoded = bincode::serialize(vault).context("Serialization error")?;
         let encrypted = encrypt_with_binding(key, hw_id, &encoded)?;
-
-        // Principal Design: Write to tmp then rename to ensure atomic filesystem commit
         let tmp_path = self.storage_path.with_extension("tmp");
         fs::write(&tmp_path, encrypted)?;
         fs::rename(&tmp_path, &self.storage_path)?; 
