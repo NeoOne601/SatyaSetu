@@ -2,24 +2,23 @@
  * PROJECT SATYA: SECURE IDENTITY BRIDGE
  * =====================================
  * PHASE: 5.0 (The Signed Interaction)
- * VERSION: 1.2.2
- * STATUS: STABLE (FFI Linking Verified)
+ * VERSION: 1.2.5
+ * STATUS: STABLE (FFI Linked)
  * DESCRIPTION:
- * Implements FFI calls to the Rust Core. Private keys never leave Rust.
- * CHANGE LOG:
- * - Phase 3.6: Android Parity Sync baselined.
- * - Phase 4.0: Identity Ledger sync and namespace-collision fix.
- * - Phase 5.0: Implementation of 'signIntent' FFI bridge mapping.
+ * Low-level implementation of the IdentityRepository using 
+ * flutter_rust_bridge. Maps native Rust types into Dart domain models.
  */
 
 import 'identity_domain.dart';
 import 'identity_repo.dart';
-// Namespacing 'bridge' prevents collisions with local SatyaIdentity domain model
+// Namespacing 'bridge' prevents naming collisions with local domain models.
 import 'bridge_generated.dart' as bridge;
 import 'dart:ffi';
 import 'dart:io';
 
-// --- Loading Strategies ---
+// ==============================================================================
+// STRATEGY PATTERN: PLATFORM LOADING
+// ==============================================================================
 abstract class RustLoaderStrategy {
   DynamicLibrary loadLibrary();
 }
@@ -38,11 +37,13 @@ class RustLoaderFactory {
   static RustLoaderStrategy getStrategy() {
     if (Platform.isAndroid) return AndroidLoader();
     if (Platform.isIOS) return IOSLoader();
-    throw UnsupportedError('Unsupported platform for Rust Core');
+    throw UnsupportedError('Unsupported platform for native Rust Core');
   }
 }
 
-// --- Implementation ---
+// ==============================================================================
+// REPOSITORY IMPLEMENTATION
+// ==============================================================================
 class IdentityRepoNative implements IdentityRepository {
   static bridge.RustCoreImpl? _apiInstance;
 
@@ -98,10 +99,10 @@ class IdentityRepoNative implements IdentityRepository {
     try {
       return await api.rustSignIntent(identityId: identityId, upiUrl: upiUrl);
     } catch (e) {
-      return '{"error": "Signing failure: $e"}';
+      return '{"error": "Rust signing failure: $e"}';
     }
   }
 }
 
-/// Factory hook used by identity_repo.dart
+/// Global builder function used by the IdentityRepository factory
 IdentityRepository getIdentityRepository() => IdentityRepoNative();

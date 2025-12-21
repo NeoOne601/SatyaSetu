@@ -2,15 +2,11 @@
  * PROJECT SATYA: RUST CORE ENGINE
  * ===============================
  * PHASE: 5.0 (The Signed Interaction)
- * VERSION: 1.2.0
- * STATUS: STABLE (Secret Storage Active)
+ * VERSION: 1.2.5
+ * STATUS: STABLE (Secret Storage Verified)
  * DESCRIPTION:
- * Manages atomic binary file operations. Implements the storage schema 
- * for both identity metadata and secret material (Ed25519 private keys).
- * CHANGE LOG:
- * - Phase 3.2: Initial VaultManager using bincode.
- * - Phase 4.0: Standardized Phase headers.
- * - Phase 5.0: Secret Material storage (HashMap) implemented.
+ * Manages atomic binary file operations for the secure vault. 
+ * Stores both identity metadata and Ed25519 signing material.
  */
 
 use serde::{Deserialize, Serialize};

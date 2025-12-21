@@ -28,7 +28,6 @@ abstract class RustCore {
 
   FlutterRustBridgeTaskConstMeta get kRustCreateIdentityConstMeta;
 
-  /// Signs a scanned UPI intent using a specific identity's private key
   Future<String> rustSignIntent(
       {required String identityId, required String upiUrl, dynamic hint});
 

@@ -2,15 +2,13 @@
  * PROJECT SATYA: RUST CORE ENGINE
  * ===============================
  * PHASE: 5.0 (The Signed Interaction)
- * VERSION: 1.2.0
+ * VERSION: 1.2.5
  * STATUS: STABLE (FFI Bridge Sync)
  * DESCRIPTION:
- * Main entry point for FFI calls. Orchestrates the signing of interactions 
- * without exposing private material to the Dart layer.
+ * Primary FFI interface. Orchestrates cryptographic signing and vault lifecycle.
  * CHANGE LOG:
- * - Phase 3.3: Vault Initialization (Argon2id/XChaCha20) added.
- * - Phase 4.0: Identity Ledger persistence and retrieval finalized.
- * - Phase 5.0: Digital Signature (rust_sign_intent) implemented.
+ * - Phase 4.0: Persistent Identity Ledger baselined.
+ * - Phase 5.0: Ed25519 signing primitives (rust_sign_intent) implemented.
  */
 
 use crate::persistence::{VaultManager, SatyaVault};
@@ -23,12 +21,11 @@ use once_cell::sync::Lazy;
 
 pub use crate::domain::UpiIntent;
 
-/// Global thread-safe session state holding the active vault and configuration
 static VAULT_STATE: Lazy<Mutex<Option<(VaultManager, SatyaVault, String, String)>>> = 
     Lazy::new(|| Mutex::new(None));
 
 pub fn rust_init_core() -> String {
-    "Satya Core Phase 5 Baselined".to_string()
+    "Satya Core Phase 5.0 Active".to_string()
 }
 
 pub fn rust_initialize_vault(pin: String, hw_id: String, storage_path: String) -> Result<bool> {
@@ -41,7 +38,7 @@ pub fn rust_initialize_vault(pin: String, hw_id: String, storage_path: String) -
             *state = Some((manager, vault, pin, hw_id));
             Ok(true)
         },
-        Err(e) => Err(anyhow!("Decryption failed: {}", e))
+        Err(e) => Err(anyhow!("Unlock failure: {}", e))
     }
 }
 
@@ -60,26 +57,23 @@ pub fn rust_create_identity(label: String) -> Result<SatyaIdentity> {
         vault.identities.push(new_id.clone());
         vault.private_keys.insert(id_uuid, priv_key);
         
-        // Atomic save ensures key persistence
+        // Persist to the binary vault immediately
         let key = VaultKey::from_pin(pin, b"satya_salt_v1")?;
         manager.atomic_save(&key, hw_id.as_bytes(), vault)?;
-        
         Ok(new_id)
     } else {
-        Err(anyhow!("Vault is locked"))
+        Err(anyhow!("Vault Locked"))
     }
 }
 
-/// Signs a scanned UPI intent using a specific identity's private key
 pub fn rust_sign_intent(identity_id: String, upi_url: String) -> Result<String> {
     let state = VAULT_STATE.lock().unwrap();
     if let Some((_, vault, _, _)) = &*state {
         let priv_key = vault.private_keys.get(&identity_id)
-            .ok_or_else(|| anyhow!("Key material not found for identity"))?;
+            .ok_or_else(|| anyhow!("Identity keys missing from vault"))?;
         
         let intent = parse_upi_url(&upi_url)?;
         
-        // Build the interaction payload
         let payload = IntentPayload {
             version: PROTOCOL_VERSION.to_string(),
             timestamp: chrono::Utc::now().timestamp(),
@@ -102,7 +96,7 @@ pub fn rust_sign_intent(identity_id: String, upi_url: String) -> Result<String> 
 
         Ok(serde_json::to_string(&signed)?)
     } else {
-        Err(anyhow!("Vault is locked"))
+        Err(anyhow!("Vault Locked"))
     }
 }
 
@@ -111,13 +105,13 @@ pub fn rust_get_identities() -> Result<Vec<SatyaIdentity>> {
     if let Some((_, vault, _, _)) = &*state {
         Ok(vault.identities.clone())
     } else {
-        Err(anyhow!("Vault is locked"))
+        Err(anyhow!("Vault Locked"))
     }
 }
 
 pub fn rust_scan_qr(raw_qr_string: String) -> Result<String> {
     match parse_upi_url(&raw_qr_string) {
         Ok(intent) => Ok(serde_json::to_string(&intent).unwrap()),
-        Err(e) => Err(anyhow!("QR parsing failure: {}", e))
+        Err(e) => Err(anyhow!("QR parsing error: {}", e))
     }
 }
