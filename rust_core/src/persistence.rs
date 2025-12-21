@@ -1,4 +1,17 @@
-// Adding Persistence and Security
+/**
+ * PROJECT SATYA: RUST CORE ENGINE
+ * ===============================
+ * PHASE: 4.0 (Identity Lifecycle & Persistence)
+ * VERSION: 1.1.0
+ * STATUS: STABLE
+ * DESCRIPTION:
+ * Manages atomic binary file operations for the secure vault.
+ * Implements "Write-Rename" pattern to ensure zero-corruption.
+ * CHANGE LOG:
+ * - Phase 3.2: Initial VaultManager with bincode support.
+ * - Phase 4.0: Standardized Phase headers.
+ */
+
 use serde::{Deserialize, Serialize};
 use crate::domain::SatyaIdentity;
 use crate::crypto::{VaultKey, encrypt_with_binding, decrypt_with_binding};
@@ -25,12 +38,13 @@ impl VaultManager {
     }
 
     pub fn atomic_save(&self, key: &VaultKey, hw_id: &[u8], vault: &SatyaVault) -> Result<()> {
-        let encoded = bincode::serialize(vault).context("Vault serialization failed")?;
+        let encoded = bincode::serialize(vault).context("Serialization error")?;
         let encrypted = encrypt_with_binding(key, hw_id, &encoded)?;
 
+        // Principal Design: Write to tmp then rename to ensure atomic filesystem commit
         let tmp_path = self.storage_path.with_extension("tmp");
         fs::write(&tmp_path, encrypted)?;
-        fs::rename(&tmp_path, &self.storage_path)?; // Atomic filesystem swap
+        fs::rename(&tmp_path, &self.storage_path)?; 
         Ok(())
     }
 

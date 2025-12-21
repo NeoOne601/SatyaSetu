@@ -17,23 +17,18 @@ pub extern "C" fn wire_rust_initialize_vault(
 }
 
 #[no_mangle]
-pub extern "C" fn wire_rust_generate_did_safe(port_: i64) {
-    wire_rust_generate_did_safe_impl(port_)
-}
-
-#[no_mangle]
 pub extern "C" fn wire_rust_create_identity(port_: i64, label: *mut wire_uint_8_list) {
     wire_rust_create_identity_impl(port_, label)
 }
 
 #[no_mangle]
-pub extern "C" fn wire_rust_scan_qr(port_: i64, raw_qr_string: *mut wire_uint_8_list) {
-    wire_rust_scan_qr_impl(port_, raw_qr_string)
+pub extern "C" fn wire_rust_get_identities(port_: i64) {
+    wire_rust_get_identities_impl(port_)
 }
 
 #[no_mangle]
-pub extern "C" fn wire_rust_get_identities(port_: i64) {
-    wire_rust_get_identities_impl(port_)
+pub extern "C" fn wire_rust_scan_qr(port_: i64, raw_qr_string: *mut wire_uint_8_list) {
+    wire_rust_scan_qr_impl(port_, raw_qr_string)
 }
 
 // Section: allocate functions

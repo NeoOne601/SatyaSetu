@@ -54,16 +54,6 @@ fn wire_rust_initialize_vault_impl(
         },
     )
 }
-fn wire_rust_generate_did_safe_impl(port_: MessagePort) {
-    FLUTTER_RUST_BRIDGE_HANDLER.wrap::<_, _, _, String, _>(
-        WrapInfo {
-            debug_name: "rust_generate_did_safe",
-            port: Some(port_),
-            mode: FfiCallMode::Normal,
-        },
-        move || move |task_callback| rust_generate_did_safe(),
-    )
-}
 fn wire_rust_create_identity_impl(port_: MessagePort, label: impl Wire2Api<String> + UnwindSafe) {
     FLUTTER_RUST_BRIDGE_HANDLER.wrap::<_, _, _, SatyaIdentity, _>(
         WrapInfo {
@@ -77,6 +67,16 @@ fn wire_rust_create_identity_impl(port_: MessagePort, label: impl Wire2Api<Strin
         },
     )
 }
+fn wire_rust_get_identities_impl(port_: MessagePort) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap::<_, _, _, Vec<SatyaIdentity>, _>(
+        WrapInfo {
+            debug_name: "rust_get_identities",
+            port: Some(port_),
+            mode: FfiCallMode::Normal,
+        },
+        move || move |task_callback| rust_get_identities(),
+    )
+}
 fn wire_rust_scan_qr_impl(port_: MessagePort, raw_qr_string: impl Wire2Api<String> + UnwindSafe) {
     FLUTTER_RUST_BRIDGE_HANDLER.wrap::<_, _, _, String, _>(
         WrapInfo {
@@ -88,16 +88,6 @@ fn wire_rust_scan_qr_impl(port_: MessagePort, raw_qr_string: impl Wire2Api<Strin
             let api_raw_qr_string = raw_qr_string.wire2api();
             move |task_callback| rust_scan_qr(api_raw_qr_string)
         },
-    )
-}
-fn wire_rust_get_identities_impl(port_: MessagePort) {
-    FLUTTER_RUST_BRIDGE_HANDLER.wrap::<_, _, _, Vec<SatyaIdentity>, _>(
-        WrapInfo {
-            debug_name: "rust_get_identities",
-            port: Some(port_),
-            mode: FfiCallMode::Normal,
-        },
-        move || move |task_callback| rust_get_identities(),
     )
 }
 // Section: wrapper structs
