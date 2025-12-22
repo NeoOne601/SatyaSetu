@@ -1,25 +1,29 @@
 #!/bin/bash
 # PROJECT SATYA: MASTER BUILD SYSTEM
 # =====================================
-# PHASE: 5.9.9 (Final Baseline)
-# VERSION: 1.5.8
-# STATUS: STABLE (Trinity Pipeline)
+# PHASE: 6.3 (Resilient Broadcaster)
+# VERSION: 1.6.3
+# STATUS: STABLE (Environment Scoped)
+# DESCRIPTION:
+# Fixes "Darwin Header Poisoning" by unsetting Mac variables 
+# during Android/iOS compilation.
 
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
 RED='\033[0;31m'
 NC='\033[0m'
 
-# --- CONFIG ---
+# --- SHARED CONFIG ---
 ANDROID_SDK_ROOT="/Volumes/Apple/Android/sdk"
 NDK_VERSION="28.2.13676358" 
 export ANDROID_NDK_HOME="$ANDROID_SDK_ROOT/ndk/$NDK_VERSION"
 ROOT_DIR=$(pwd)
 
-# --- MAC HEADER RESOLVER ---
-export SDKROOT=$(xcrun --sdk macosx --show-sdk-path)
-export C_INCLUDE_PATH="$SDKROOT/usr/include"
-export CPATH="$SDKROOT/usr/include"
+# --- CLEAN ENVIRONMENT FOR FFI ---
+# Ensure no Mac-specific CPATH leaks into general tools
+unset SDKROOT
+unset CPATH
+unset C_INCLUDE_PATH
 
 echo -e "${BLUE}>>> [1/3] FFI Sync (Codegen)...${NC}"
 flutter_rust_bridge_codegen \
@@ -30,7 +34,7 @@ flutter_rust_bridge_codegen \
 
 cd rust_core || exit 1
 
-# --- ANDROID ---
+# --- ANDROID (Strictly No Mac Headers) ---
 echo "Building Android Binaries..."
 cargo ndk -t arm64-v8a -o "$ROOT_DIR/flutter_app/android/app/src/main/jniLibs" build --release || exit 1
 
@@ -39,11 +43,14 @@ echo "Building iOS Static Libs..."
 cargo build --release --target aarch64-apple-ios-sim || exit 1
 cp "target/aarch64-apple-ios-sim/release/librust_core.a" "$ROOT_DIR/flutter_app/ios/Runner/librust_core.a"
 
-# --- macOS ---
+# --- macOS (Scoped Mac Environment) ---
 echo "Building macOS Native (.dylib)..."
+# Apply Mac headers ONLY for this specific block
+export SDKROOT=$(xcrun --sdk macosx --show-sdk-path)
+export CPATH="$SDKROOT/usr/include"
 cargo build --release --target aarch64-apple-darwin || exit 1
 cp "target/aarch64-apple-darwin/release/librust_core.dylib" "$ROOT_DIR/flutter_app/macos/librust_core.dylib"
 cp "target/aarch64-apple-darwin/release/librust_core.dylib" "$ROOT_DIR/flutter_app/librust_core.dylib"
 
-echo -e "${GREEN}✓ Phase 5.9.9 Trinity Build Successful.${NC}"
+echo -e "${GREEN}✓ Phase 6.3 Trinity Build Successful.${NC}"
 exit 0

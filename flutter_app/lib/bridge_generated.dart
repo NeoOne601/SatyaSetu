@@ -33,7 +33,7 @@ abstract class RustCore {
 
   FlutterRustBridgeTaskConstMeta get kRustSignIntentConstMeta;
 
-  /// PHASE 6.1: Resilient Decentralized Broadcasting
+  /// PHASE 6.2: Multi-Threaded Resilient Broadcast
   Future<bool> rustPublishToNostr({required String signedJson, dynamic hint});
 
   FlutterRustBridgeTaskConstMeta get kRustPublishToNostrConstMeta;

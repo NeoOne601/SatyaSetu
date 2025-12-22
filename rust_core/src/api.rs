@@ -1,12 +1,9 @@
 /**
  * PROJECT SATYA: RUST CORE ENGINE
  * ===============================
- * PHASE: 6.1 (The Resilient Broadcast)
- * VERSION: 1.6.1
- * STATUS: STABLE (Multi-Threaded FFI)
- * DESCRIPTION:
- * Main FFI entry point. Orchestrates signing and global broadcasting. 
- * Prevents FFI deadlocks using a multi-threaded tokio runtime.
+ * PHASE: 6.3 (Resilient Broadcaster)
+ * VERSION: 1.6.3
+ * STATUS: STABLE (Nostr Signer Fixed)
  */
 
 use crate::persistence::{VaultManager, SatyaVault};
@@ -25,7 +22,7 @@ static VAULT_STATE: Lazy<Mutex<Option<(VaultManager, SatyaVault, String, String)
     Lazy::new(|| Mutex::new(None));
 
 pub fn rust_init_core() -> String {
-    "Satya Core Phase 6.1 Active".to_string()
+    "Satya Core Phase 6.3 Active".to_string()
 }
 
 pub fn rust_initialize_vault(pin: String, hw_id: String, storage_path: String) -> Result<bool> {
@@ -77,10 +74,9 @@ pub fn rust_sign_intent(identity_id: String, upi_url: String) -> Result<String> 
     } else { Err(anyhow!("Vault Locked")) }
 }
 
-/// PHASE 6.1: Resilient Decentralized Broadcasting
+/// PHASE 6.3: Global Decentralized Broadcast
 pub fn rust_publish_to_nostr(signed_json: String) -> Result<bool> {
-    // Principal Design: Use multi-threaded runtime with background workers 
-    // to prevent FFI thread deadlock on emulators.
+    // Principal Fix: Multi-threaded runtime avoids FFI thread-starvation
     let rt = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .worker_threads(2)
@@ -88,25 +84,24 @@ pub fn rust_publish_to_nostr(signed_json: String) -> Result<bool> {
 
     rt.block_on(async {
         let keys = Keys::generate();
-        let client = Client::new(&keys);
+        // Principal Fix: Pass owned keys to the Client (nostr-sdk 0.36 constraint)
+        let client = Client::new(keys.clone());
 
-        // Add relays with diverse protocol support
         client.add_relay("wss://relay.damus.io").await?;
         client.add_relay("wss://nos.lol").await?;
 
-        // Connect with a hard timeout for DNS/WebSocket handshakes
+        // Handshake with 15s timeout
         let connect_future = client.connect();
-        if let Err(_) = tokio::time::timeout(Duration::from_secs(10), connect_future).await {
-            return Err(anyhow!("Network timeout connecting to Nostr relays"));
+        if let Err(_) = tokio::time::timeout(Duration::from_secs(15), connect_future).await {
+            return Err(anyhow!("Relay connection timeout"));
         }
 
-        // Custom Satya Interaction (Kind 29001)
+        // Principal Fix: Use .sign() instead of deprecated .to_event()
         let event = EventBuilder::new(Kind::from(29001), signed_json, [])
-            .to_event(&keys)?;
+            .sign(&keys)?;
         
         client.send_event(event).await?;
         client.disconnect().await?;
-        
         Ok(true)
     })
 }
@@ -120,6 +115,6 @@ pub fn rust_get_identities() -> Result<Vec<SatyaIdentity>> {
 pub fn rust_scan_qr(raw_qr_string: String) -> Result<String> {
     match parse_upi_url(&raw_qr_string) {
         Ok(intent) => Ok(serde_json::to_string(&intent).unwrap()),
-        Err(e) => Err(anyhow!("QR error: {}", e))
+        Err(e) => Err(anyhow!("QR Error: {}", e))
     }
 }
