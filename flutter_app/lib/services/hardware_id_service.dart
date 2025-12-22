@@ -1,10 +1,8 @@
 /**
  * PROJECT SATYA: SECURE IDENTITY BRIDGE
  * =====================================
- * PHASE: 5.0 (The Signed Interaction)
- * VERSION: 1.5.0
- * DESCRIPTION:
- * Stabilizes hardware signatures across the "Trinity" (Android, iOS, iMac).
+ * PHASE: 5.9.9 (Final Trinity Baseline)
+ * VERSION: 1.5.8
  */
 
 import 'dart:io';
@@ -16,17 +14,22 @@ class HardwareIdService {
     try {
       if (Platform.isMacOS) {
         final macInfo = await deviceInfo.macOsInfo;
-        return macInfo.systemGUID ?? "macos_dev_stable";
+        return macInfo.systemGUID ?? "macos_stable_id";
       } else if (Platform.isIOS) {
         final iosInfo = await deviceInfo.iosInfo;
-        return iosInfo.identifierForVendor ?? "ios_dev_fallback"; 
+        return iosInfo.identifierForVendor ?? "ios_stable_id"; 
       } else if (Platform.isAndroid) {
         final androidInfo = await deviceInfo.androidInfo;
-        return androidInfo.id; 
+        // Principal Fix: Emulator detection to provide stable ID during development
+        final baseId = androidInfo.id;
+        if (baseId == "android_id" || baseId.isEmpty) {
+           return "android_emu_${androidInfo.model}";
+        }
+        return baseId;
       }
     } catch (e) {
-      print("SATYA_SECURITY: Fallback ID active.");
+      print("SATYA_SECURITY: ID Fallback active.");
     }
-    return "satya_unbound_identity";
+    return "satya_generic_id";
   }
 }

@@ -1,9 +1,9 @@
 #!/bin/bash
 # PROJECT SATYA: MASTER BUILD SYSTEM
 # =====================================
-# PHASE: 5.9.6 (Final Baseline)
-# VERSION: 1.5.1
-# STATUS: STABLE (Trinity Ready)
+# PHASE: 5.9.9 (Final Baseline)
+# VERSION: 1.5.8
+# STATUS: STABLE (Trinity Pipeline)
 
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
@@ -21,12 +21,12 @@ export SDKROOT=$(xcrun --sdk macosx --show-sdk-path)
 export C_INCLUDE_PATH="$SDKROOT/usr/include"
 export CPATH="$SDKROOT/usr/include"
 
-echo -e "${BLUE}>>> [1/3] FFI Sync...${NC}"
+echo -e "${BLUE}>>> [1/3] FFI Sync (Codegen)...${NC}"
 flutter_rust_bridge_codegen \
     --rust-input rust_core/src/api.rs \
     --dart-output flutter_app/lib/bridge_generated.dart \
     --rust-output rust_core/src/bridge_generated.rs \
-    --rust-crate-dir rust_core || { echo -e "${RED}Codegen Failed${NC}"; exit 1; }
+    --rust-crate-dir rust_core || { echo -e "${RED}Sync Failed${NC}"; exit 1; }
 
 cd rust_core || exit 1
 
@@ -42,9 +42,8 @@ cp "target/aarch64-apple-ios-sim/release/librust_core.a" "$ROOT_DIR/flutter_app/
 # --- macOS ---
 echo "Building macOS Native (.dylib)..."
 cargo build --release --target aarch64-apple-darwin || exit 1
-# Deploying to both folders for search parity
 cp "target/aarch64-apple-darwin/release/librust_core.dylib" "$ROOT_DIR/flutter_app/macos/librust_core.dylib"
 cp "target/aarch64-apple-darwin/release/librust_core.dylib" "$ROOT_DIR/flutter_app/librust_core.dylib"
 
-echo -e "${GREEN}✓ Phase 5.9.6 Trinity Build Successful.${NC}"
+echo -e "${GREEN}✓ Phase 5.9.9 Trinity Build Successful.${NC}"
 exit 0
