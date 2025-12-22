@@ -1,12 +1,12 @@
 /**
  * PROJECT SATYA: SECURE IDENTITY BRIDGE
  * =====================================
- * PHASE: 5.9.1 (iMac Stability Patch)
- * VERSION: 1.4.1
- * STATUS: STABLE (Silent Loading)
+ * PHASE: 5.9.6 (iMac Stability Baseline)
+ * VERSION: 1.5.1
+ * STATUS: STABLE (Robust Singleton)
  * DESCRIPTION:
- * Refines macOS library loading to prevent terminal spam. 
- * Implements strict singleton pattern for RustCoreImpl.
+ * Implements FFI calls. Uses a strict singleton for the Rust API to 
+ * prevent symbol collision and terminal noise on iMac.
  */
 
 import 'identity_domain.dart';
@@ -32,14 +32,12 @@ class IOSLoader implements RustLoaderStrategy {
 class MacOSLoader implements RustLoaderStrategy {
   @override
   DynamicLibrary loadLibrary() {
-    // Search paths in order of priority
     final paths = [
       'librust_core.dylib',
       'macos/librust_core.dylib',
       '${File(Platform.resolvedExecutable).parent.path}/../Frameworks/librust_core.dylib',
     ];
-
-    for (final path in paths) {
+    for (var path in paths) {
       if (File(path).existsSync() || path == 'librust_core.dylib') {
         try {
           return DynamicLibrary.open(path);
@@ -53,6 +51,7 @@ class MacOSLoader implements RustLoaderStrategy {
 class IdentityRepoNative implements IdentityRepository {
   static bridge.RustCoreImpl? _apiInstance;
 
+  // Principal Fix: Singleton wrapper ensures initialization happens exactly once
   bridge.RustCoreImpl get api {
     if (_apiInstance != null) return _apiInstance!;
     final strategy = Platform.isAndroid 
@@ -67,7 +66,7 @@ class IdentityRepoNative implements IdentityRepository {
     try {
       return await api.rustInitializeVault(pin: pin, hwId: hardwareId, storagePath: path);
     } catch (e) {
-      print("SATYA_SECURITY: Silicon Binding Refused - $e");
+      print("SATYA_SECURITY_FAIL: $e");
       return false;
     }
   }
@@ -90,19 +89,19 @@ class IdentityRepoNative implements IdentityRepository {
 
   @override
   Future<String> scanQr(String rawCode) async {
-    try { return await api.rustScanQr(rawQrString: rawCode); } 
+    try { return await api.rustScanQr(rawQrString: rawCode); }
     catch (e) { return '{"error": "$e"}'; }
   }
 
   @override
   Future<String> signIntent(String identityId, String upiUrl) async {
-    try { return await api.rustSignIntent(identityId: identityId, upiUrl: upiUrl); } 
-    catch (e) { return '{"error": "$e"}'; }
+    try { return await api.rustSignIntent(identityId: identityId, upiUrl: upiUrl); }
+    catch (e) { return '{"error": "Rust signing failure: $e"}'; }
   }
 
   @override
   Future<bool> publishToNostr(String signedJson) async {
-    try { return await api.rustPublishToNostr(signedJson: signedJson); } 
+    try { return await api.rustPublishToNostr(signedJson: signedJson); }
     catch (e) { return false; }
   }
 }

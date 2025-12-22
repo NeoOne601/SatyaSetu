@@ -1,10 +1,10 @@
 /**
  * PROJECT SATYA: SECURE IDENTITY BRIDGE
  * =====================================
- * PHASE: 5.9 (Hardware Resilience Patch)
- * VERSION: 1.3.9
+ * PHASE: 5.0 (The Signed Interaction)
+ * VERSION: 1.5.0
  * DESCRIPTION:
- * Stabilizes the hardware signature on macOS using systemGUID.
+ * Stabilizes hardware signatures across the "Trinity" (Android, iOS, iMac).
  */
 
 import 'dart:io';
@@ -16,7 +16,6 @@ class HardwareIdService {
     try {
       if (Platform.isMacOS) {
         final macInfo = await deviceInfo.macOsInfo;
-        // systemGUID is the stable Silicon-Binding for iMacs
         return macInfo.systemGUID ?? "macos_dev_stable";
       } else if (Platform.isIOS) {
         final iosInfo = await deviceInfo.iosInfo;
@@ -26,7 +25,7 @@ class HardwareIdService {
         return androidInfo.id; 
       }
     } catch (e) {
-      print("SATYA_SECURITY_WARN: Using fallback ID: $e");
+      print("SATYA_SECURITY: Fallback ID active.");
     }
     return "satya_unbound_identity";
   }

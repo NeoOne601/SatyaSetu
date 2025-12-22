@@ -1,12 +1,12 @@
 /**
  * PROJECT SATYA: SECURE IDENTITY BRIDGE
  * =====================================
- * PHASE: 5.7 (macOS Native Recovery)
- * VERSION: 1.3.6
- * STATUS: STABLE (Architectural Baseline)
+ * PHASE: 5.9.6 (iMac Stability Baseline)
+ * VERSION: 1.5.1
+ * STATUS: STABLE (Architectural Standard)
  * DESCRIPTION:
- * Abstract contract for Identity operations. Defines the interface 
- * for the Silicon-Locked Rust implementation across all platforms.
+ * Defines the abstract interface for identity and signing operations.
+ * Manages the Trinity Pipeline (Android, iOS, macOS) injection.
  */
 
 import 'identity_domain.dart';
