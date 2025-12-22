@@ -7,7 +7,7 @@ edition = "2021"
 crate-type = ["staticlib", "cdylib"]
 
 [dependencies]
-# Phase 3-5: Baseline
+# Phase 3-5: Baseline Infrastructure
 flutter_rust_bridge = "1.82.6"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
@@ -25,6 +25,6 @@ hex = "0.4"
 ed25519-dalek = { version = "2.1", features = ["serde", "rand_core"] }
 
 # PHASE 6: Decentralized Proof (Nostr)
-# Principal Design: Standard features enabled for TLS/WebSocket support.
+# Principal Design: Standard features enabled for secure TLS/WebSocket support.
 nostr-sdk = { version = "0.36", features = ["all-nips"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "time", "net"] }

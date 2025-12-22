@@ -1,9 +1,9 @@
 /**
  * PROJECT SATYA: RUST CORE ENGINE
  * ===============================
- * PHASE: 6.3 (Resilient Broadcaster)
- * VERSION: 1.6.3
- * STATUS: STABLE (Nostr Signer Fixed)
+ * PHASE: 6.4 (Resilient Broadcaster)
+ * VERSION: 1.6.4
+ * STATUS: STABLE (Async Signer Fixed)
  */
 
 use crate::persistence::{VaultManager, SatyaVault};
@@ -22,7 +22,7 @@ static VAULT_STATE: Lazy<Mutex<Option<(VaultManager, SatyaVault, String, String)
     Lazy::new(|| Mutex::new(None));
 
 pub fn rust_init_core() -> String {
-    "Satya Core Phase 6.3 Active".to_string()
+    "Satya Core Phase 6.4 Active".to_string()
 }
 
 pub fn rust_initialize_vault(pin: String, hw_id: String, storage_path: String) -> Result<bool> {
@@ -55,7 +55,7 @@ pub fn rust_create_identity(label: String) -> Result<SatyaIdentity> {
 pub fn rust_sign_intent(identity_id: String, upi_url: String) -> Result<String> {
     let state = VAULT_STATE.lock().unwrap();
     if let Some((_, vault, _, _)) = &*state {
-        let priv_key = vault.private_keys.get(&identity_id).ok_or_else(|| anyhow!("Key missing"))?;
+        let priv_key = vault.private_keys.get(&identity_id).ok_or_else(|| anyhow!("Keys missing"))?;
         let intent = parse_upi_url(&upi_url)?;
         let payload = IntentPayload {
             version: PROTOCOL_VERSION.to_string(),
@@ -74,9 +74,9 @@ pub fn rust_sign_intent(identity_id: String, upi_url: String) -> Result<String> 
     } else { Err(anyhow!("Vault Locked")) }
 }
 
-/// PHASE 6.3: Global Decentralized Broadcast
+/// PHASE 6.4: Multi-Threaded Decentralized Broadcasting
 pub fn rust_publish_to_nostr(signed_json: String) -> Result<bool> {
-    // Principal Fix: Multi-threaded runtime avoids FFI thread-starvation
+    // Principal Design: Use a multi-threaded builder to prevent deadlock in FFI 
     let rt = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .worker_threads(2)
@@ -84,21 +84,20 @@ pub fn rust_publish_to_nostr(signed_json: String) -> Result<bool> {
 
     rt.block_on(async {
         let keys = Keys::generate();
-        // Principal Fix: Pass owned keys to the Client (nostr-sdk 0.36 constraint)
         let client = Client::new(keys.clone());
 
         client.add_relay("wss://relay.damus.io").await?;
         client.add_relay("wss://nos.lol").await?;
 
-        // Handshake with 15s timeout
+        // 15-second timeout for the WebSocket handshake
         let connect_future = client.connect();
         if let Err(_) = tokio::time::timeout(Duration::from_secs(15), connect_future).await {
             return Err(anyhow!("Relay connection timeout"));
         }
 
-        // Principal Fix: Use .sign() instead of deprecated .to_event()
+        // PRINCIPAL FIX: Added .await to .sign() and used modern v0.36 API
         let event = EventBuilder::new(Kind::from(29001), signed_json, [])
-            .sign(&keys)?;
+            .sign(&keys).await?;
         
         client.send_event(event).await?;
         client.disconnect().await?;

@@ -1,12 +1,12 @@
 #!/bin/bash
 # PROJECT SATYA: MASTER BUILD SYSTEM
 # =====================================
-# PHASE: 6.3 (Resilient Broadcaster)
-# VERSION: 1.6.3
+# PHASE: 6.4 (Resilient Trinity Baseline)
+# VERSION: 1.6.4
 # STATUS: STABLE (Environment Scoped)
 # DESCRIPTION:
 # Fixes "Darwin Header Poisoning" by unsetting Mac variables 
-# during Android/iOS compilation.
+# during Android compilation.
 
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
@@ -20,7 +20,7 @@ export ANDROID_NDK_HOME="$ANDROID_SDK_ROOT/ndk/$NDK_VERSION"
 ROOT_DIR=$(pwd)
 
 # --- CLEAN ENVIRONMENT FOR FFI ---
-# Ensure no Mac-specific CPATH leaks into general tools
+# Ensure no global Mac-specific CPATH leaks into general tools
 unset SDKROOT
 unset CPATH
 unset C_INCLUDE_PATH
@@ -34,7 +34,7 @@ flutter_rust_bridge_codegen \
 
 cd rust_core || exit 1
 
-# --- ANDROID (Strictly No Mac Headers) ---
+# --- ANDROID (Strictly Clean Environment) ---
 echo "Building Android Binaries..."
 cargo ndk -t arm64-v8a -o "$ROOT_DIR/flutter_app/android/app/src/main/jniLibs" build --release || exit 1
 
@@ -45,12 +45,12 @@ cp "target/aarch64-apple-ios-sim/release/librust_core.a" "$ROOT_DIR/flutter_app/
 
 # --- macOS (Scoped Mac Environment) ---
 echo "Building macOS Native (.dylib)..."
-# Apply Mac headers ONLY for this specific block
+# Apply Mac headers ONLY for this specific block to prevent poisoning other targets
 export SDKROOT=$(xcrun --sdk macosx --show-sdk-path)
 export CPATH="$SDKROOT/usr/include"
 cargo build --release --target aarch64-apple-darwin || exit 1
 cp "target/aarch64-apple-darwin/release/librust_core.dylib" "$ROOT_DIR/flutter_app/macos/librust_core.dylib"
 cp "target/aarch64-apple-darwin/release/librust_core.dylib" "$ROOT_DIR/flutter_app/librust_core.dylib"
 
-echo -e "${GREEN}✓ Phase 6.3 Trinity Build Successful.${NC}"
+echo -e "${GREEN}✓ Phase 6.4 Trinity Build Successful.${NC}"
 exit 0
