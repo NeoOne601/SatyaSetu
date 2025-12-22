@@ -3,6 +3,8 @@
  * =====================================
  * PHASE: 5.9.9 (Final Trinity Baseline)
  * VERSION: 1.5.8
+ * DESCRIPTION:
+ * Harmonizes hardware signatures for Android, iOS, and macOS.
  */
 
 import 'dart:io';
@@ -20,7 +22,6 @@ class HardwareIdService {
         return iosInfo.identifierForVendor ?? "ios_stable_id"; 
       } else if (Platform.isAndroid) {
         final androidInfo = await deviceInfo.androidInfo;
-        // Principal Fix: Emulator detection to provide stable ID during development
         final baseId = androidInfo.id;
         if (baseId == "android_id" || baseId.isEmpty) {
            return "android_emu_${androidInfo.model}";
@@ -28,8 +29,8 @@ class HardwareIdService {
         return baseId;
       }
     } catch (e) {
-      print("SATYA_SECURITY: ID Fallback active.");
+      print("SATYA_SECURITY: Fallback active.");
     }
-    return "satya_generic_id";
+    return "satya_unbound_generic_id";
   }
 }

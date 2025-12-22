@@ -1,12 +1,12 @@
 /**
  * PROJECT SATYA: SECURE IDENTITY BRIDGE
  * =====================================
- * PHASE: 5.9.9 (Final Trinity Baseline)
+ * PHASE: 5.9.9 (The Trinity Final Baseline)
  * VERSION: 1.5.8
- * STATUS: STABLE (Singleton Standard)
+ * STATUS: STABLE (Silent Loading)
  * DESCRIPTION:
- * Implements FFI calls. Prevents private key leakage by keeping 
- * signing logic inside the native Rust binary.
+ * Implements FFI calls. Prevents symbol re-loading noise and ensures 
+ * high-performance signing logic on Android, iOS, and iMac.
  */
 
 import 'identity_domain.dart';
@@ -32,24 +32,27 @@ class IOSLoader implements RustLoaderStrategy {
 class MacOSLoader implements RustLoaderStrategy {
   @override
   DynamicLibrary loadLibrary() {
-    final List<String> possiblePaths = [
+    final paths = [
       'librust_core.dylib',
       'macos/librust_core.dylib',
       '${File(Platform.resolvedExecutable).parent.path}/../Frameworks/librust_core.dylib',
     ];
-    for (var path in possiblePaths) {
+    for (var path in paths) {
       if (File(path).existsSync() || path == 'librust_core.dylib') {
-        try { return DynamicLibrary.open(path); } catch (_) {}
+        try {
+          final dylib = DynamicLibrary.open(path);
+          print("SATYA_DEBUG: Rust Core loaded from $path");
+          return dylib;
+        } catch (_) {}
       }
     }
-    throw UnsupportedError('Rust binary missing. Ensure build_mobile.sh was run.');
+    throw UnsupportedError('Rust Core binary missing. Run ./build_mobile.sh');
   }
 }
 
 class IdentityRepoNative implements IdentityRepository {
   static bridge.RustCoreImpl? _apiInstance;
 
-  // Principal Fix: Static singleton prevents symbol re-initialization crashes
   bridge.RustCoreImpl get api {
     if (_apiInstance != null) return _apiInstance!;
     final strategy = Platform.isAndroid 
@@ -64,7 +67,7 @@ class IdentityRepoNative implements IdentityRepository {
     try {
       return await api.rustInitializeVault(pin: pin, hwId: hardwareId, storagePath: path);
     } catch (e) {
-      print("SATYA_SECURITY: Binding Refused.");
+      print("SATYA_VAULT: Binding mismatch detected.");
       return false;
     }
   }
@@ -94,7 +97,7 @@ class IdentityRepoNative implements IdentityRepository {
   @override
   Future<String> signIntent(String identityId, String upiUrl) async {
     try { return await api.rustSignIntent(identityId: identityId, upiUrl: upiUrl); }
-    catch (e) { return '{"error": "Signing failed: $e"}'; }
+    catch (e) { return '{"error": "Rust signing failure: $e"}'; }
   }
 
   @override

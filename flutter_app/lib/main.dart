@@ -5,8 +5,8 @@
  * VERSION: 1.5.8
  * STATUS: STABLE (Android, iOS, macOS Unified)
  * DESCRIPTION:
- * Resolves Android emulator hangs via async debouncing. Enforces 6-digit
- * PINs and provides a system font fallback for terminal stability.
+ * Orchestrates the full Trust Machine UX. Fixes the Android hang via 
+ * async debouncing and provides the 'Data Loss' reset warning.
  */
 
 import 'dart:io';
@@ -32,7 +32,6 @@ class SatyaApp extends StatelessWidget {
   final VaultService vaultService;
   final IdentityRepository repo;
   const SatyaApp({super.key, required this.vaultService, required this.repo});
-
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -41,7 +40,7 @@ class SatyaApp extends StatelessWidget {
       theme: ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF00FFC8), brightness: Brightness.dark),
-        // Principal Fix: System fallback prevents terminal font warnings on Desktop/Emulators
+        // System fallback prevents terminal font warnings on Desktop/Emulators
         textTheme: ThemeData.dark().textTheme.apply(fontFamily: 'Verdana'),
       ),
       home: UnlockScreen(vaultService: vaultService, repo: repo),
@@ -49,9 +48,6 @@ class SatyaApp extends StatelessWidget {
   }
 }
 
-// ==============================================================================
-// AUTH: THE CLEAN SLATE GATEKEEPER
-// ==============================================================================
 class UnlockScreen extends StatefulWidget {
   final VaultService vaultService;
   final IdentityRepository repo;
@@ -68,10 +64,6 @@ class _UnlockScreenState extends State<UnlockScreen> {
   @override
   void initState() {
     super.initState();
-    _resetInput();
-  }
-
-  void _resetInput() {
     _pinController.clear();
     _focusNode.requestFocus();
   }
@@ -81,30 +73,30 @@ class _UnlockScreenState extends State<UnlockScreen> {
     setState(() { _isLoading = true; _showReset = false; });
     
     try {
-      // Principal Fix: Yield execution to allow UI to render the loading state
+      // Yield execution to allow UI to render the loading state
       await Future.delayed(const Duration(milliseconds: 100));
       
       final directory = await getApplicationSupportDirectory();
       final hwId = await HardwareIdService.getDeviceId();
-      
       final success = await widget.vaultService.unlock(_pinController.text, hwId, directory.path);
       
       if (success && mounted) {
         Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => HomeScreen(vaultService: widget.vaultService, repo: widget.repo)));
       } else {
-        setState(() { _showReset = true; });
-        _resetInput();
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Vault Access Denied: PIN or Hardware Mismatch")));
+        setState(() => _showReset = true);
+        _pinController.clear();
+        _focusNode.requestFocus();
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Vault Access Denied")));
       }
     } finally { if (mounted) setState(() => _isLoading = false); }
   }
 
-  Future<void> _confirmReset() async {
+  Future<void> _factoryReset() async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text("Factory Reset?"),
-        content: const Text("Silicon-Binding failed. Factory resetting will permanently wipe all local identities. Continue?"),
+        title: const Text("Delete Local Wallet?"),
+        content: const Text("Resetting will permanently wipe all local identities. Continue?"),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("Cancel")),
           ElevatedButton(onPressed: () => Navigator.pop(context, true), style: ElevatedButton.styleFrom(backgroundColor: Colors.red), child: const Text("Wipe & Reset")),
@@ -115,7 +107,7 @@ class _UnlockScreenState extends State<UnlockScreen> {
       final directory = await getApplicationSupportDirectory();
       final vaultDir = Directory("${directory.path}/satya_vault");
       if (await vaultDir.exists()) await vaultDir.delete(recursive: true);
-      _resetInput();
+      _pinController.clear();
       setState(() => _showReset = false);
     }
   }
@@ -141,7 +133,6 @@ class _UnlockScreenState extends State<UnlockScreen> {
                 enabled: !_isLoading,
                 keyboardType: TextInputType.number,
                 textAlign: TextAlign.center,
-                // Principal Fix: Limit length to 6 characters and prevent non-digits
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(6)],
                 style: const TextStyle(fontSize: 24, letterSpacing: 16, color: Color(0xFF00FFC8)),
                 decoration: const InputDecoration(hintText: "••••••", filled: true),
@@ -151,7 +142,7 @@ class _UnlockScreenState extends State<UnlockScreen> {
               _isLoading 
                 ? const Column(children: [CircularProgressIndicator(), SizedBox(height: 16), Text("Computing Silicon Keys...", style: TextStyle(fontSize: 10, color: Colors.white24))]) 
                 : ElevatedButton(onPressed: _attemptUnlock, style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 60)), child: const Text("Unlock Identity")),
-              if (_showReset) TextButton(onPressed: _confirmReset, child: const Text("Hardware Mismatch? Reset Local Vault", style: TextStyle(color: Colors.redAccent))),
+              if (_showReset) TextButton(onPressed: _factoryReset, child: const Text("Hardware Mismatch? Reset Local Vault", style: TextStyle(color: Colors.redAccent))),
             ],
           ),
         ),
@@ -160,9 +151,6 @@ class _UnlockScreenState extends State<UnlockScreen> {
   }
 }
 
-// ==============================================================================
-// LEDGER: WALLET INTERFACE
-// ==============================================================================
 class HomeScreen extends StatefulWidget {
   final VaultService vaultService;
   final IdentityRepository repo;
@@ -173,21 +161,20 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   List<SatyaIdentity> _identities = [];
   bool _isSyncing = true;
-
   @override void initState() { super.initState(); _refresh(); }
   Future<void> _refresh() async { setState(() => _isSyncing = true); final list = await widget.repo.getIdentities(); setState(() { _identities = list; _isSyncing = false; }); }
 
   Future<void> _createNew() async {
-    final name = TextEditingController(text: "Merchant ${DateTime.now().minute}");
-    final ok = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(title: const Text("New Identity"), content: TextField(controller: name), actions: [TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("Cancel")), ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text("Generate"))]));
+    final name = TextEditingController(text: "Identity ${DateTime.now().minute}");
+    final ok = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(title: const Text("New Identity"), content: TextField(controller: name), actions: [TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("Cancel")), ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text("Create"))]));
     if (ok == true) { await widget.vaultService.createNewIdentity(name.text); await _refresh(); }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("LEDGER"), centerTitle: true, actions: [IconButton(icon: const Icon(LucideIcons.plus), onPressed: _createNew)]),
-      body: _isSyncing ? const Center(child: CircularProgressIndicator()) : _identities.isEmpty ? Center(child: ElevatedButton(onPressed: _createNew, child: const Text("Create First Identity"))) : ListView.builder(padding: const EdgeInsets.all(16), itemCount: _identities.length, itemBuilder: (c, i) => Card(child: ListTile(leading: const Icon(LucideIcons.userCheck, color: Color(0xFF00FFC8)), title: Text(_identities[i].label), subtitle: Text(_identities[i].did, style: const TextStyle(fontSize: 10, color: Colors.white38))))),
+      appBar: AppBar(title: const Text("IDENTITY LEDGER"), centerTitle: true, actions: [IconButton(icon: const Icon(LucideIcons.plusCircle), onPressed: _createNew)]),
+      body: _isSyncing ? const Center(child: CircularProgressIndicator()) : _identities.isEmpty ? Center(child: ElevatedButton.icon(onPressed: _createNew, icon: const Icon(LucideIcons.plus), label: const Text("Create First Identity"))) : ListView.builder(padding: const EdgeInsets.all(16), itemCount: _identities.length, itemBuilder: (c, i) => Card(child: ListTile(leading: const Icon(LucideIcons.userCheck, color: Color(0xFF00FFC8)), title: Text(_identities[i].label), subtitle: Text(_identities[i].did, style: const TextStyle(fontSize: 10, color: Colors.white38))))),
       floatingActionButton: FloatingActionButton(onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => ScannerPage(repo: widget.repo, identities: _identities))), backgroundColor: const Color(0xFF00FFC8), child: const Icon(LucideIcons.scan, color: Colors.black)),
     );
   }
@@ -207,15 +194,11 @@ class _ScannerPageState extends State<ScannerPage> {
   void _handleResult(String code) async {
     if (_isProcessing) return;
     setState(() => _isProcessing = true);
-    
-    // Principal Fix: Pause camera hardware immediately to prevent loop
     _controller.stop();
-    
     final result = await widget.repo.scanQr(code);
     if (mounted) {
-      await showModalBottomSheet(context: context, isScrollControlled: true, builder: (ctx) => Container(padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, children: [const Icon(LucideIcons.fileSignature, size: 48, color: Color(0xFF00FFC8)), const SizedBox(height: 16), const Text("Sign Interaction?", style: TextStyle(fontWeight: FontWeight.bold)), const SizedBox(height: 12), Text(result, style: const TextStyle(fontFamily: 'monospace', fontSize: 10)), const SizedBox(height: 24), ...widget.identities.map((id) => Card(child: ListTile(title: Text(id.label), leading: const Icon(LucideIcons.fingerprint), onTap: () async { Navigator.pop(ctx); final signed = await widget.repo.signIntent(id.id, code); _showSigned(signed); })))])),);
+      await showModalBottomSheet(context: context, isScrollControlled: true, builder: (ctx) => Container(padding: const EdgeInsets.all(24), child: Column(mainAxisSize: MainAxisSize.min, children: [const Icon(LucideIcons.fileSignature, size: 48, color: Color(0xFF00FFC8)), const SizedBox(height: 16), const Text("Sign Interaction?", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)), const SizedBox(height: 12), Text(result, style: const TextStyle(fontFamily: 'monospace', fontSize: 10)), const SizedBox(height: 24), ...widget.identities.map((id) => Card(child: ListTile(title: Text(id.label), leading: const Icon(LucideIcons.fingerprint), onTap: () async { Navigator.pop(ctx); final signed = await widget.repo.signIntent(id.id, code); _showSigned(signed); })))])),);
     }
-    
     _controller.start();
     setState(() => _isProcessing = false);
   }

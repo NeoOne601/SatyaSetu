@@ -1,9 +1,12 @@
 /**
  * PROJECT SATYA: RUST CORE ENGINE
  * ===============================
- * PHASE: 5.7 (macOS Native Recovery)
- * VERSION: 1.3.6
- * STATUS: STABLE (FFI Match)
+ * PHASE: 5.9.9 (Final Trinity Baseline)
+ * VERSION: 1.5.8
+ * STATUS: STABLE (Nostr Ready)
+ * DESCRIPTION:
+ * Final Phase 5 API hub. Includes placeholder for Nostr publishing 
+ * to ensure Flutter compilation parity.
  */
 
 use crate::persistence::{VaultManager, SatyaVault};
@@ -20,13 +23,12 @@ static VAULT_STATE: Lazy<Mutex<Option<(VaultManager, SatyaVault, String, String)
     Lazy::new(|| Mutex::new(None));
 
 pub fn rust_init_core() -> String {
-    "Satya Core Phase 5.7 Recovery".to_string()
+    "Satya Core Phase 5.9.9 Active".to_string()
 }
 
 pub fn rust_initialize_vault(pin: String, hw_id: String, storage_path: String) -> Result<bool> {
     let manager = VaultManager::new(&storage_path);
     let key = VaultKey::from_pin(&pin, b"satya_salt_v1")?;
-    
     match manager.load(&key, hw_id.as_bytes()) {
         Ok(vault) => {
             let mut state = VAULT_STATE.lock().unwrap();
@@ -54,7 +56,7 @@ pub fn rust_create_identity(label: String) -> Result<SatyaIdentity> {
 pub fn rust_sign_intent(identity_id: String, upi_url: String) -> Result<String> {
     let state = VAULT_STATE.lock().unwrap();
     if let Some((_, vault, _, _)) = &*state {
-        let priv_key = vault.private_keys.get(&identity_id).ok_or_else(|| anyhow!("Key not found"))?;
+        let priv_key = vault.private_keys.get(&identity_id).ok_or_else(|| anyhow!("Key material missing"))?;
         let intent = parse_upi_url(&upi_url)?;
         let payload = IntentPayload {
             version: PROTOCOL_VERSION.to_string(),
@@ -73,9 +75,8 @@ pub fn rust_sign_intent(identity_id: String, upi_url: String) -> Result<String> 
     } else { Err(anyhow!("Vault Locked")) }
 }
 
-// Phase 6 Placeholder for FFI Sync
 pub fn rust_publish_to_nostr(_signed_json: String) -> Result<bool> {
-    Ok(false)
+    Ok(false) // Placeholder for Phase 6
 }
 
 pub fn rust_get_identities() -> Result<Vec<SatyaIdentity>> {
