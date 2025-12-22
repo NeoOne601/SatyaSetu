@@ -87,7 +87,7 @@ fn wire_rust_sign_intent_impl(
 }
 fn wire_rust_publish_to_nostr_impl(
     port_: MessagePort,
-    _signed_json: impl Wire2Api<String> + UnwindSafe,
+    signed_json: impl Wire2Api<String> + UnwindSafe,
 ) {
     FLUTTER_RUST_BRIDGE_HANDLER.wrap::<_, _, _, bool, _>(
         WrapInfo {
@@ -96,8 +96,8 @@ fn wire_rust_publish_to_nostr_impl(
             mode: FfiCallMode::Normal,
         },
         move || {
-            let api__signed_json = _signed_json.wire2api();
-            move |task_callback| rust_publish_to_nostr(api__signed_json)
+            let api_signed_json = signed_json.wire2api();
+            move |task_callback| rust_publish_to_nostr(api_signed_json)
         },
     )
 }

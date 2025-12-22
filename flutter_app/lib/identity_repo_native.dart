@@ -1,12 +1,9 @@
 /**
  * PROJECT SATYA: SECURE IDENTITY BRIDGE
  * =====================================
- * PHASE: 5.9.9 (The Trinity Final Baseline)
- * VERSION: 1.5.8
- * STATUS: STABLE (Silent Loading)
- * DESCRIPTION:
- * Implements FFI calls. Prevents symbol re-loading noise and ensures 
- * high-performance signing logic on Android, iOS, and iMac.
+ * PHASE: 6.0 (The Decentralized Proof)
+ * VERSION: 1.6.0
+ * STATUS: STABLE (Nostr Mapping Enabled)
  */
 
 import 'identity_domain.dart';
@@ -39,14 +36,10 @@ class MacOSLoader implements RustLoaderStrategy {
     ];
     for (var path in paths) {
       if (File(path).existsSync() || path == 'librust_core.dylib') {
-        try {
-          final dylib = DynamicLibrary.open(path);
-          print("SATYA_DEBUG: Rust Core loaded from $path");
-          return dylib;
-        } catch (_) {}
+        try { return DynamicLibrary.open(path); } catch (_) {}
       }
     }
-    throw UnsupportedError('Rust Core binary missing. Run ./build_mobile.sh');
+    throw UnsupportedError('Rust binary missing.');
   }
 }
 
@@ -55,21 +48,14 @@ class IdentityRepoNative implements IdentityRepository {
 
   bridge.RustCoreImpl get api {
     if (_apiInstance != null) return _apiInstance!;
-    final strategy = Platform.isAndroid 
-        ? AndroidLoader() 
-        : Platform.isMacOS ? MacOSLoader() : IOSLoader();
+    final strategy = Platform.isAndroid ? AndroidLoader() : Platform.isMacOS ? MacOSLoader() : IOSLoader();
     _apiInstance = bridge.RustCoreImpl(strategy.loadLibrary());
     return _apiInstance!;
   }
 
   @override
   Future<bool> initializeVault(String pin, String hardwareId, String path) async {
-    try {
-      return await api.rustInitializeVault(pin: pin, hwId: hardwareId, storagePath: path);
-    } catch (e) {
-      print("SATYA_VAULT: Binding mismatch detected.");
-      return false;
-    }
+    try { return await api.rustInitializeVault(pin: pin, hwId: hardwareId, storagePath: path); } catch (e) { return false; }
   }
 
   @override
@@ -90,20 +76,23 @@ class IdentityRepoNative implements IdentityRepository {
 
   @override
   Future<String> scanQr(String rawCode) async {
-    try { return await api.rustScanQr(rawQrString: rawCode); }
-    catch (e) { return '{"error": "$e"}'; }
+    try { return await api.rustScanQr(rawQrString: rawCode); } catch (e) { return '{"error": "$e"}'; }
   }
 
   @override
   Future<String> signIntent(String identityId, String upiUrl) async {
-    try { return await api.rustSignIntent(identityId: identityId, upiUrl: upiUrl); }
-    catch (e) { return '{"error": "Rust signing failure: $e"}'; }
+    try { return await api.rustSignIntent(identityId: identityId, upiUrl: upiUrl); } catch (e) { return '{"error": "$e"}'; }
   }
 
   @override
   Future<bool> publishToNostr(String signedJson) async {
-    try { return await api.rustPublishToNostr(signedJson: signedJson); }
-    catch (e) { return false; }
+    try { 
+      // Real FFI call to Phase 6 Rust Engine
+      return await api.rustPublishToNostr(signedJson: signedJson); 
+    } catch (e) { 
+      print("SATYA_FFI_NOSTR: $e");
+      return false; 
+    }
   }
 }
 

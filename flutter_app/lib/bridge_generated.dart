@@ -33,6 +33,7 @@ abstract class RustCore {
 
   FlutterRustBridgeTaskConstMeta get kRustSignIntentConstMeta;
 
+  /// PHASE 6.1: Resilient Decentralized Broadcasting
   Future<bool> rustPublishToNostr({required String signedJson, dynamic hint});
 
   FlutterRustBridgeTaskConstMeta get kRustPublishToNostrConstMeta;
@@ -435,9 +436,9 @@ class RustCoreWire implements FlutterRustBridgeWireBase {
 
   void wire_rust_publish_to_nostr(
     int port_,
-    ffi.Pointer<wire_uint_8_list> _signed_json,
+    ffi.Pointer<wire_uint_8_list> signed_json,
   ) {
-    return _wire_rust_publish_to_nostr(port_, _signed_json);
+    return _wire_rust_publish_to_nostr(port_, signed_json);
   }
 
   late final _wire_rust_publish_to_nostrPtr = _lookup<

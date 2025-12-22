@@ -1,23 +1,17 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- 
-      PHASE 3.6: PERSISTENCE AND SECURITY (Silicon-Locked Baseline)
-      Version: 1.0.2
-      Changes:
-      - Added CAMERA for 'mobile_scanner' (UPI QR processing)
-      - Added READ_PHONE_STATE (maxSdk 29) for Hardware Binding fallback
-    -->
+    <!-- PHASE 6.1: Global Broadcast Permissions -->
+    <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.READ_PHONE_STATE" android:maxSdkVersion="29" />
 
     <application
-        android:label="flutter_app"
+        android:label="SatyaSetu"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTop"
-            android:taskAffinity=""
             android:theme="@style/LaunchTheme"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
             android:hardwareAccelerated="true"
@@ -31,7 +25,6 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
-        
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
