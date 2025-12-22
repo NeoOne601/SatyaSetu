@@ -1,24 +1,20 @@
 /**
  * PROJECT SATYA: SECURE IDENTITY BRIDGE
  * =====================================
- * PHASE: 5.0 (The Signed Interaction)
- * VERSION: 1.2.5
- * STATUS: STABLE (FFI Linked)
+ * PHASE: 5.9.1 (iMac Stability Patch)
+ * VERSION: 1.4.1
+ * STATUS: STABLE (Silent Loading)
  * DESCRIPTION:
- * Low-level implementation of the IdentityRepository using 
- * flutter_rust_bridge. Maps native Rust types into Dart domain models.
+ * Refines macOS library loading to prevent terminal spam. 
+ * Implements strict singleton pattern for RustCoreImpl.
  */
 
 import 'identity_domain.dart';
 import 'identity_repo.dart';
-// Namespacing 'bridge' prevents naming collisions with local domain models.
 import 'bridge_generated.dart' as bridge;
 import 'dart:ffi';
 import 'dart:io';
 
-// ==============================================================================
-// STRATEGY PATTERN: PLATFORM LOADING
-// ==============================================================================
 abstract class RustLoaderStrategy {
   DynamicLibrary loadLibrary();
 }
@@ -33,25 +29,36 @@ class IOSLoader implements RustLoaderStrategy {
   DynamicLibrary loadLibrary() => DynamicLibrary.process();
 }
 
-class RustLoaderFactory {
-  static RustLoaderStrategy getStrategy() {
-    if (Platform.isAndroid) return AndroidLoader();
-    if (Platform.isIOS) return IOSLoader();
-    throw UnsupportedError('Unsupported platform for native Rust Core');
+class MacOSLoader implements RustLoaderStrategy {
+  @override
+  DynamicLibrary loadLibrary() {
+    // Search paths in order of priority
+    final paths = [
+      'librust_core.dylib',
+      'macos/librust_core.dylib',
+      '${File(Platform.resolvedExecutable).parent.path}/../Frameworks/librust_core.dylib',
+    ];
+
+    for (final path in paths) {
+      if (File(path).existsSync() || path == 'librust_core.dylib') {
+        try {
+          return DynamicLibrary.open(path);
+        } catch (_) {}
+      }
+    }
+    throw UnsupportedError('Rust Core binary not found. Please run ./build_mobile.sh');
   }
 }
 
-// ==============================================================================
-// REPOSITORY IMPLEMENTATION
-// ==============================================================================
 class IdentityRepoNative implements IdentityRepository {
   static bridge.RustCoreImpl? _apiInstance;
 
   bridge.RustCoreImpl get api {
     if (_apiInstance != null) return _apiInstance!;
-    final strategy = RustLoaderFactory.getStrategy();
-    final dylib = strategy.loadLibrary();
-    _apiInstance = bridge.RustCoreImpl(dylib);
+    final strategy = Platform.isAndroid 
+        ? AndroidLoader() 
+        : Platform.isMacOS ? MacOSLoader() : IOSLoader();
+    _apiInstance = bridge.RustCoreImpl(strategy.loadLibrary());
     return _apiInstance!;
   }
 
@@ -60,7 +67,7 @@ class IdentityRepoNative implements IdentityRepository {
     try {
       return await api.rustInitializeVault(pin: pin, hwId: hardwareId, storagePath: path);
     } catch (e) {
-      print("SATYA_FFI_ERROR: Vault unlock failure: $e");
+      print("SATYA_SECURITY: Silicon Binding Refused - $e");
       return false;
     }
   }
@@ -70,9 +77,7 @@ class IdentityRepoNative implements IdentityRepository {
     try {
       final result = await api.rustCreateIdentity(label: label);
       return SatyaIdentity(id: result.id, label: result.label, did: result.did);
-    } catch (e) {
-      return SatyaIdentity(id: "error", label: "Error", did: "did:error:$e");
-    }
+    } catch (e) { return SatyaIdentity(id: "err", label: "Error", did: "err"); }
   }
 
   @override
@@ -80,29 +85,26 @@ class IdentityRepoNative implements IdentityRepository {
     try {
       final results = await api.rustGetIdentities();
       return results.map((r) => SatyaIdentity(id: r.id, label: r.label, did: r.did)).toList();
-    } catch (e) {
-      return [];
-    }
+    } catch (e) { return []; }
   }
 
   @override
   Future<String> scanQr(String rawCode) async {
-    try {
-      return await api.rustScanQr(rawQrString: rawCode);
-    } catch (e) {
-      return '{"error": "$e"}';
-    }
+    try { return await api.rustScanQr(rawQrString: rawCode); } 
+    catch (e) { return '{"error": "$e"}'; }
   }
 
   @override
   Future<String> signIntent(String identityId, String upiUrl) async {
-    try {
-      return await api.rustSignIntent(identityId: identityId, upiUrl: upiUrl);
-    } catch (e) {
-      return '{"error": "Rust signing failure: $e"}';
-    }
+    try { return await api.rustSignIntent(identityId: identityId, upiUrl: upiUrl); } 
+    catch (e) { return '{"error": "$e"}'; }
+  }
+
+  @override
+  Future<bool> publishToNostr(String signedJson) async {
+    try { return await api.rustPublishToNostr(signedJson: signedJson); } 
+    catch (e) { return false; }
   }
 }
 
-/// Global builder function used by the IdentityRepository factory
 IdentityRepository getIdentityRepository() => IdentityRepoNative();

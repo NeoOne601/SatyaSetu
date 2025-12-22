@@ -85,6 +85,22 @@ fn wire_rust_sign_intent_impl(
         },
     )
 }
+fn wire_rust_publish_to_nostr_impl(
+    port_: MessagePort,
+    _signed_json: impl Wire2Api<String> + UnwindSafe,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap::<_, _, _, bool, _>(
+        WrapInfo {
+            debug_name: "rust_publish_to_nostr",
+            port: Some(port_),
+            mode: FfiCallMode::Normal,
+        },
+        move || {
+            let api__signed_json = _signed_json.wire2api();
+            move |task_callback| rust_publish_to_nostr(api__signed_json)
+        },
+    )
+}
 fn wire_rust_get_identities_impl(port_: MessagePort) {
     FLUTTER_RUST_BRIDGE_HANDLER.wrap::<_, _, _, Vec<SatyaIdentity>, _>(
         WrapInfo {

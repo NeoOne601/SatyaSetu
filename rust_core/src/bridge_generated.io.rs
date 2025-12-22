@@ -31,6 +31,11 @@ pub extern "C" fn wire_rust_sign_intent(
 }
 
 #[no_mangle]
+pub extern "C" fn wire_rust_publish_to_nostr(port_: i64, _signed_json: *mut wire_uint_8_list) {
+    wire_rust_publish_to_nostr_impl(port_, _signed_json)
+}
+
+#[no_mangle]
 pub extern "C" fn wire_rust_get_identities(port_: i64) {
     wire_rust_get_identities_impl(port_)
 }

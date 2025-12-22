@@ -1,15 +1,10 @@
 /**
  * PROJECT SATYA: SECURE IDENTITY BRIDGE
  * =====================================
- * PHASE: 4.0 (Identity Lifecycle & Persistence)
- * VERSION: 1.1.0
- * STATUS: STABLE
+ * PHASE: 5.9 (Hardware Resilience Patch)
+ * VERSION: 1.3.9
  * DESCRIPTION:
- * Fetches unique hardware signatures to use as Additional Authenticated 
- * Data (AAD) for binary vault encryption.
- * CHANGE LOG:
- * - Phase 3.3: Initial Silicon ID extraction logic.
- * - Phase 4.0: Standardized Phase headers and error state fallbacks.
+ * Stabilizes the hardware signature on macOS using systemGUID.
  */
 
 import 'dart:io';
@@ -18,9 +13,12 @@ import 'package:device_info_plus/device_info_plus.dart';
 class HardwareIdService {
   static Future<String> getDeviceId() async {
     final deviceInfo = DeviceInfoPlugin();
-    
     try {
-      if (Platform.isIOS) {
+      if (Platform.isMacOS) {
+        final macInfo = await deviceInfo.macOsInfo;
+        // systemGUID is the stable Silicon-Binding for iMacs
+        return macInfo.systemGUID ?? "macos_dev_stable";
+      } else if (Platform.isIOS) {
         final iosInfo = await deviceInfo.iosInfo;
         return iosInfo.identifierForVendor ?? "ios_dev_fallback"; 
       } else if (Platform.isAndroid) {
@@ -28,9 +26,8 @@ class HardwareIdService {
         return androidInfo.id; 
       }
     } catch (e) {
-      print("SATYA_SECURITY_WARN: Silicon Binding fallback active: $e");
+      print("SATYA_SECURITY_WARN: Using fallback ID: $e");
     }
-    
-    return "satya_generic_dev_id";
+    return "satya_unbound_identity";
   }
 }

@@ -33,6 +33,10 @@ abstract class RustCore {
 
   FlutterRustBridgeTaskConstMeta get kRustSignIntentConstMeta;
 
+  Future<bool> rustPublishToNostr({required String signedJson, dynamic hint});
+
+  FlutterRustBridgeTaskConstMeta get kRustPublishToNostrConstMeta;
+
   Future<List<SatyaIdentity>> rustGetIdentities({dynamic hint});
 
   FlutterRustBridgeTaskConstMeta get kRustGetIdentitiesConstMeta;
@@ -149,6 +153,25 @@ class RustCoreImpl implements RustCore {
       const FlutterRustBridgeTaskConstMeta(
         debugName: "rust_sign_intent",
         argNames: ["identityId", "upiUrl"],
+      );
+
+  Future<bool> rustPublishToNostr({required String signedJson, dynamic hint}) {
+    var arg0 = _platform.api2wire_String(signedJson);
+    return _platform.executeNormal(FlutterRustBridgeTask(
+      callFfi: (port_) =>
+          _platform.inner.wire_rust_publish_to_nostr(port_, arg0),
+      parseSuccessData: _wire2api_bool,
+      parseErrorData: _wire2api_FrbAnyhowException,
+      constMeta: kRustPublishToNostrConstMeta,
+      argValues: [signedJson],
+      hint: hint,
+    ));
+  }
+
+  FlutterRustBridgeTaskConstMeta get kRustPublishToNostrConstMeta =>
+      const FlutterRustBridgeTaskConstMeta(
+        debugName: "rust_publish_to_nostr",
+        argNames: ["signedJson"],
       );
 
   Future<List<SatyaIdentity>> rustGetIdentities({dynamic hint}) {
@@ -409,6 +432,20 @@ class RustCoreWire implements FlutterRustBridgeWireBase {
         ffi.Pointer<wire_uint_8_list>,
         ffi.Pointer<wire_uint_8_list>,
       )>();
+
+  void wire_rust_publish_to_nostr(
+    int port_,
+    ffi.Pointer<wire_uint_8_list> _signed_json,
+  ) {
+    return _wire_rust_publish_to_nostr(port_, _signed_json);
+  }
+
+  late final _wire_rust_publish_to_nostrPtr = _lookup<
+      ffi.NativeFunction<
+          ffi.Void Function(ffi.Int64,
+              ffi.Pointer<wire_uint_8_list>)>>('wire_rust_publish_to_nostr');
+  late final _wire_rust_publish_to_nostr = _wire_rust_publish_to_nostrPtr
+      .asFunction<void Function(int, ffi.Pointer<wire_uint_8_list>)>();
 
   void wire_rust_get_identities(int port_) {
     return _wire_rust_get_identities(port_);
