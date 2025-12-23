@@ -1,9 +1,9 @@
 /**
  * PROJECT SATYA: SECURE IDENTITY BRIDGE
  * =====================================
- * PHASE: 6.4 (Resilient Broadcaster)
- * VERSION: 1.6.4
- * STATUS: STABLE (UX Verified)
+ * PHASE: 6.5 (The Decentralized Proof)
+ * VERSION: 1.6.5
+ * STATUS: STABLE (Broadcast Ready)
  */
 
 import 'dart:io';
@@ -40,11 +40,104 @@ class SatyaApp extends StatelessWidget {
   }
 }
 
-// ... UnlockScreen and HomeScreen logic remain stable ...
-class UnlockScreen extends StatefulWidget { final VaultService vaultService; final IdentityRepository repo; const UnlockScreen({super.key, required this.vaultService, required this.repo}); @override State<UnlockScreen> createState() => _UnlockScreenState(); }
-class _UnlockScreenState extends State<UnlockScreen> { final TextEditingController _pinController = TextEditingController(); final FocusNode _focusNode = FocusNode(); bool _isLoading = false; bool _showReset = false; @override void initState() { super.initState(); _pinController.clear(); _focusNode.requestFocus(); } Future<void> _attemptUnlock() async { if (_pinController.text.length < 6) return; setState(() { _isLoading = true; _showReset = false; }); try { await Future.delayed(const Duration(milliseconds: 100)); final directory = await getApplicationSupportDirectory(); final hwId = await HardwareIdService.getDeviceId(); final success = await widget.vaultService.unlock(_pinController.text, hwId, directory.path); if (success && mounted) { Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => HomeScreen(vaultService: widget.vaultService, repo: widget.repo))); } else { setState(() => _showReset = true); _pinController.clear(); _focusNode.requestFocus(); if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Vault Access Denied"))); } } finally { if (mounted) setState(() => _isLoading = false); } } Future<void> _factoryReset() async { final confirmed = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(title: const Text("Factory Reset?"), content: const Text("Wipes all identities. Continue?"), actions: [TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("Cancel")), ElevatedButton(onPressed: () => Navigator.pop(ctx, true), style: ElevatedButton.styleFrom(backgroundColor: Colors.red), child: const Text("Reset"))])); if (confirmed == true) { final directory = await getApplicationSupportDirectory(); final vaultDir = Directory("${directory.path}/satya_vault"); if (await vaultDir.exists()) await vaultDir.delete(recursive: true); _pinController.clear(); setState(() => _showReset = false); } } @override Widget build(BuildContext context) { return Scaffold(body: Center(child: Container(constraints: const BoxConstraints(maxWidth: 400), padding: const EdgeInsets.all(32), child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [const Icon(LucideIcons.shieldCheck, size: 80, color: Color(0xFF00FFC8)), const SizedBox(height: 24), const Text("SATYASETU", style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, letterSpacing: 4)), const SizedBox(height: 48), TextField(controller: _pinController, focusNode: _focusNode, obscureText: true, enabled: !_isLoading, keyboardType: TextInputType.number, textAlign: TextAlign.center, inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(6)], style: const TextStyle(fontSize: 24, letterSpacing: 16, color: Color(0xFF00FFC8)), decoration: const InputDecoration(hintText: "••••••", filled: true), onChanged: (v) { if (v.length == 6) _attemptUnlock(); }), const SizedBox(height: 32), _isLoading ? const Column(children: [CircularProgressIndicator(), SizedBox(height: 16), Text("Computing Silicon Keys...", style: TextStyle(fontSize: 10, color: Colors.white24))]) : ElevatedButton(onPressed: _attemptUnlock, style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 60)), child: const Text("Unlock Identity")), if (_showReset) TextButton(onPressed: _factoryReset, child: const Text("Hardware Mismatch? Reset Local Vault", style: TextStyle(color: Colors.redAccent))), ])))); } }
-class HomeScreen extends StatefulWidget { final VaultService vaultService; final IdentityRepository repo; const HomeScreen({super.key, required this.vaultService, required this.repo}); @override State<HomeScreen> createState() => _HomeScreenState(); }
-class _HomeScreenState extends State<HomeScreen> { List<SatyaIdentity> _identities = []; bool _isSyncing = true; @override void initState() { super.initState(); _refresh(); } Future<void> _refresh() async { setState(() => _isSyncing = true); final list = await widget.repo.getIdentities(); setState(() { _identities = list; _isSyncing = false; }); } Future<void> _addId() async { final c = TextEditingController(text: "Merchant ${DateTime.now().minute}"); final ok = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(title: const Text("New Identity"), content: TextField(controller: c), actions: [TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("Cancel")), ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text("Create"))])); if (ok == true) { await widget.vaultService.createNewIdentity(c.text); await _refresh(); } } @override Widget build(BuildContext context) { return Scaffold(appBar: AppBar(title: const Text("IDENTITY LEDGER"), centerTitle: true, actions: [IconButton(icon: const Icon(LucideIcons.plusCircle), onPressed: _addId)]), body: _isSyncing ? const Center(child: CircularProgressIndicator()) : _identities.isEmpty ? Center(child: ElevatedButton.icon(onPressed: _addId, icon: const Icon(LucideIcons.plus), label: const Text("Create First Identity"))) : ListView.builder(padding: const EdgeInsets.all(16), itemCount: _identities.length, itemBuilder: (c, i) => Card(child: ListTile(leading: const Icon(LucideIcons.userCheck, color: Color(0xFF00FFC8)), title: Text(_identities[i].label), subtitle: Text(_identities[i].did, style: const TextStyle(fontSize: 10, color: Colors.white30))))), floatingActionButton: FloatingActionButton(onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => ScannerPage(repo: widget.repo, identities: _identities))), backgroundColor: const Color(0xFF00FFC8), child: const Icon(LucideIcons.scan, color: Colors.black))); } }
+class UnlockScreen extends StatefulWidget {
+  final VaultService vaultService;
+  final IdentityRepository repo;
+  const UnlockScreen({super.key, required this.vaultService, required this.repo});
+  @override State<UnlockScreen> createState() => _UnlockScreenState();
+}
+
+class _UnlockScreenState extends State<UnlockScreen> {
+  final TextEditingController _pinController = TextEditingController();
+  final FocusNode _focusNode = FocusNode();
+  bool _isLoading = false;
+  bool _showReset = false;
+
+  @override
+  void initState() { super.initState(); _pinController.clear(); _focusNode.requestFocus(); }
+
+  Future<void> _attemptUnlock() async {
+    if (_pinController.text.length < 6) return;
+    setState(() { _isLoading = true; _showReset = false; });
+    try {
+      await Future.delayed(const Duration(milliseconds: 100));
+      final directory = await getApplicationSupportDirectory();
+      final hwId = await HardwareIdService.getDeviceId();
+      final success = await widget.vaultService.unlock(_pinController.text, hwId, directory.path);
+      if (success && mounted) {
+        Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => HomeScreen(vaultService: widget.vaultService, repo: widget.repo)));
+      } else {
+        setState(() => _showReset = true);
+        _pinController.clear();
+        _focusNode.requestFocus();
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Vault Access Denied")));
+      }
+    } finally { if (mounted) setState(() => _isLoading = false); }
+  }
+
+  Future<void> _factoryReset() async {
+    final confirmed = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(title: const Text("Factory Reset?"), content: const Text("Resetting will permanently wipe all identities. Continue?"), actions: [TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("Cancel")), ElevatedButton(onPressed: () => Navigator.pop(ctx, true), style: ElevatedButton.styleFrom(backgroundColor: Colors.red), child: const Text("Reset"))]));
+    if (confirmed == true) {
+      final directory = await getApplicationSupportDirectory();
+      final vaultDir = Directory("${directory.path}/satya_vault");
+      // PRINCIPAL FIX: Aggressively delete the entire vault directory for macOS reset stability
+      if (await vaultDir.exists()) {
+        await vaultDir.delete(recursive: true);
+      }
+      _pinController.clear();
+      setState(() => _showReset = false);
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Vault Cleaned. Create new identity.")));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Center(child: Container(constraints: const BoxConstraints(maxWidth: 400), padding: const EdgeInsets.all(32), child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+              const Icon(LucideIcons.shieldCheck, size: 80, color: Color(0xFF00FFC8)),
+              const SizedBox(height: 24),
+              const Text("SATYASETU", style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, letterSpacing: 4)),
+              const SizedBox(height: 48),
+              TextField(controller: _pinController, focusNode: _focusNode, obscureText: true, enabled: !_isLoading, keyboardType: TextInputType.number, textAlign: TextAlign.center, inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(6)], style: const TextStyle(fontSize: 24, letterSpacing: 16, color: Color(0xFF00FFC8)), decoration: const InputDecoration(hintText: "••••••", filled: true), onChanged: (v) { if (v.length == 6) _attemptUnlock(); }),
+              const SizedBox(height: 32),
+              _isLoading ? const Column(children: [CircularProgressIndicator(), SizedBox(height: 16), Text("Computing Silicon Keys...", style: TextStyle(fontSize: 10, color: Colors.white24))]) : ElevatedButton(onPressed: _attemptUnlock, style: ElevatedButton.styleFrom(minimumSize: const Size(double.infinity, 60)), child: const Text("Unlock Identity")),
+              if (_showReset) TextButton(onPressed: _factoryReset, child: const Text("Hardware Mismatch? Reset Local Vault", style: TextStyle(color: Colors.redAccent))),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class HomeScreen extends StatefulWidget {
+  final VaultService vaultService;
+  final IdentityRepository repo;
+  const HomeScreen({super.key, required this.vaultService, required this.repo});
+  @override State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  List<SatyaIdentity> _identities = [];
+  bool _isSyncing = true;
+  @override void initState() { super.initState(); _refresh(); }
+  Future<void> _refresh() async { setState(() => _isSyncing = true); final list = await widget.repo.getIdentities(); setState(() { _identities = list; _isSyncing = false; }); }
+
+  Future<void> _createNew() async {
+    final name = TextEditingController(text: "Merchant ${DateTime.now().minute}");
+    final ok = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(title: const Text("New Identity"), content: TextField(controller: name), actions: [TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("Cancel")), ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text("Generate"))]));
+    if (ok == true) { await widget.vaultService.createNewIdentity(name.text); await _refresh(); }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text("LEDGER"), centerTitle: true, actions: [IconButton(icon: const Icon(LucideIcons.plusCircle), onPressed: _createNew)]),
+      body: _isSyncing ? const Center(child: CircularProgressIndicator()) : _identities.isEmpty ? Center(child: ElevatedButton.icon(onPressed: _createNew, icon: const Icon(LucideIcons.plus), label: const Text("Create First Identity"))) : ListView.builder(padding: const EdgeInsets.all(16), itemCount: _identities.length, itemBuilder: (c, i) => Card(child: ListTile(leading: const Icon(LucideIcons.userCheck, color: Color(0xFF00FFC8)), title: Text(_identities[i].label), subtitle: Text(_identities[i].did, style: const TextStyle(fontSize: 10, color: Colors.white30))))),
+      floatingActionButton: FloatingActionButton(onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => ScannerPage(repo: widget.repo, identities: _identities))), backgroundColor: const Color(0xFF00FFC8), child: const Icon(LucideIcons.scan, color: Colors.black)),
+    );
+  }
+}
 
 class ScannerPage extends StatefulWidget {
   final IdentityRepository repo;
@@ -98,7 +191,7 @@ class _ScannerPageState extends State<ScannerPage> {
               const SizedBox(height: 16),
               Container(width: double.infinity, padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: Colors.black, borderRadius: BorderRadius.circular(12)), child: SelectableText(signed, style: const TextStyle(fontFamily: 'Courier', fontSize: 10, color: Colors.greenAccent))),
               const SizedBox(height: 24),
-              if (isBroadcasting) const Column(children: [CircularProgressIndicator(), SizedBox(height: 12), Text("Broadcasting to Decentralized Network...", style: TextStyle(fontSize: 10))]) 
+              if (isBroadcasting) const Column(children: [CircularProgressIndicator(), SizedBox(height: 12), Text("Broadcasting to global relays...", style: TextStyle(fontSize: 10))]) 
               else ElevatedButton.icon(
                 onPressed: () async {
                   setModalState(() => isBroadcasting = true);
@@ -131,7 +224,7 @@ class _ScannerPageState extends State<ScannerPage> {
         MobileScanner(
           controller: _controller, 
           onDetect: (c) { 
-            // Principal Fix: Prevent RangeError crash by checking barcodes list
+            // PRINCIPAL FIX: Defensive guard for empty barcode list to prevent RangeError crash
             if (c.barcodes.isNotEmpty && c.barcodes.first.rawValue != null) {
               _handleResult(c.barcodes.first.rawValue!); 
             }

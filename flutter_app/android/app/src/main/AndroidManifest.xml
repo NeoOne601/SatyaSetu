@@ -1,5 +1,5 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Mandatory for decentralized relay broadcasting -->
+    <!-- Mandatory for global broadcasting -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.READ_PHONE_STATE" android:maxSdkVersion="29" />
@@ -8,6 +8,12 @@
         android:label="SatyaSetu"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+        
+        <!-- PRINCIPAL FIX: Explicitly define Flutter v2 Embedding Metadata inside Application tag -->
+        <meta-data
+            android:name="flutterEmbedding"
+            android:value="2" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
