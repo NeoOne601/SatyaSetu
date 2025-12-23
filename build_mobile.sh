@@ -31,7 +31,7 @@ flutter_rust_bridge_codegen \
 
 cd rust_core || exit 1
 
-# --- ANDROID (Pristine Environment) ---
+# --- ANDROID (Clean) ---
 echo "Building Android Binaries..."
 cargo ndk -t arm64-v8a -o "$ROOT_DIR/flutter_app/android/app/src/main/jniLibs" build --release || exit 1
 
@@ -40,7 +40,7 @@ echo "Building iOS Static Libs..."
 cargo build --release --target aarch64-apple-ios-sim || exit 1
 cp "target/aarch64-apple-ios-sim/release/librust_core.a" "$ROOT_DIR/flutter_app/ios/Runner/librust_core.a"
 
-# --- macOS (Scoped Variables Only) ---
+# --- macOS (Scoped Only) ---
 echo "Building macOS Native (.dylib)..."
 export SDKROOT=$(xcrun --sdk macosx --show-sdk-path)
 export CPATH="$SDKROOT/usr/include"

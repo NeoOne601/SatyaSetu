@@ -1,9 +1,9 @@
 /**
  * PROJECT SATYA: SECURE IDENTITY BRIDGE
  * =====================================
- * PHASE: 6.5 (The Decentralized Proof)
- * VERSION: 1.6.5
- * STATUS: STABLE (Broadcast Ready)
+ * PHASE: 6.6 (Forensic Baseline)
+ * VERSION: 1.6.6
+ * STATUS: STABLE (Surgical Reset Active)
  */
 
 import 'dart:io';
@@ -70,23 +70,27 @@ class _UnlockScreenState extends State<UnlockScreen> {
         setState(() => _showReset = true);
         _pinController.clear();
         _focusNode.requestFocus();
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Vault Access Denied")));
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Vault Access Denied: PIN or Binding Mismatch")));
       }
     } finally { if (mounted) setState(() => _isLoading = false); }
   }
 
   Future<void> _factoryReset() async {
-    final confirmed = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(title: const Text("Factory Reset?"), content: const Text("Resetting will permanently wipe all identities. Continue?"), actions: [TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("Cancel")), ElevatedButton(onPressed: () => Navigator.pop(ctx, true), style: ElevatedButton.styleFrom(backgroundColor: Colors.red), child: const Text("Reset"))]));
+    final confirmed = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(title: const Text("Factory Reset Vault?"), content: const Text("This will permanently wipe all local identities and clear the hardware lock. Proceed?"), actions: [TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("Cancel")), ElevatedButton(onPressed: () => Navigator.pop(ctx, true), style: ElevatedButton.styleFrom(backgroundColor: Colors.red), child: const Text("Wipe All Data"))]));
     if (confirmed == true) {
       final directory = await getApplicationSupportDirectory();
       final vaultDir = Directory("${directory.path}/satya_vault");
-      // PRINCIPAL FIX: Aggressively delete the entire vault directory for macOS reset stability
-      if (await vaultDir.exists()) {
-        await vaultDir.delete(recursive: true);
+      // PRINCIPAL FIX: Aggressive recursive deletion to ensure binary vault is purged from iMac filesystem
+      try {
+        if (await vaultDir.exists()) {
+          await vaultDir.delete(recursive: true);
+        }
+        _pinController.clear();
+        setState(() => _showReset = false);
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Vault Initialized. You can now set a new PIN.")));
+      } catch (e) {
+        if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("System Error during wipe: $e")));
       }
-      _pinController.clear();
-      setState(() => _showReset = false);
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Vault Cleaned. Create new identity.")));
     }
   }
 
@@ -132,8 +136,8 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("LEDGER"), centerTitle: true, actions: [IconButton(icon: const Icon(LucideIcons.plusCircle), onPressed: _createNew)]),
-      body: _isSyncing ? const Center(child: CircularProgressIndicator()) : _identities.isEmpty ? Center(child: ElevatedButton.icon(onPressed: _createNew, icon: const Icon(LucideIcons.plus), label: const Text("Create First Identity"))) : ListView.builder(padding: const EdgeInsets.all(16), itemCount: _identities.length, itemBuilder: (c, i) => Card(child: ListTile(leading: const Icon(LucideIcons.userCheck, color: Color(0xFF00FFC8)), title: Text(_identities[i].label), subtitle: Text(_identities[i].did, style: const TextStyle(fontSize: 10, color: Colors.white30))))),
+      appBar: AppBar(title: const Text("IDENTITY LEDGER"), centerTitle: true, actions: [IconButton(icon: const Icon(LucideIcons.plusCircle), onPressed: _createNew)]),
+      body: _isSyncing ? const Center(child: CircularProgressIndicator()) : _identities.isEmpty ? Center(child: ElevatedButton.icon(onPressed: _createNew, icon: const Icon(LucideIcons.plus), label: const Text("Create First Identity"))) : ListView.builder(padding: const EdgeInsets.all(16), itemCount: _identities.length, itemBuilder: (c, i) => Card(child: ListTile(leading: const Icon(LucideIcons.userCheck, color: Color(0xFF00FFC8)), title: Text(_identities[i].label), subtitle: Text(_identities[i].did, style: const TextStyle(fontSize: 10, color: Colors.white38))))),
       floatingActionButton: FloatingActionButton(onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => ScannerPage(repo: widget.repo, identities: _identities))), backgroundColor: const Color(0xFF00FFC8), child: const Icon(LucideIcons.scan, color: Colors.black)),
     );
   }
@@ -191,7 +195,7 @@ class _ScannerPageState extends State<ScannerPage> {
               const SizedBox(height: 16),
               Container(width: double.infinity, padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: Colors.black, borderRadius: BorderRadius.circular(12)), child: SelectableText(signed, style: const TextStyle(fontFamily: 'Courier', fontSize: 10, color: Colors.greenAccent))),
               const SizedBox(height: 24),
-              if (isBroadcasting) const Column(children: [CircularProgressIndicator(), SizedBox(height: 12), Text("Broadcasting to global relays...", style: TextStyle(fontSize: 10))]) 
+              if (isBroadcasting) const Column(children: [CircularProgressIndicator(), SizedBox(height: 12), Text("Broadcasting to network...", style: TextStyle(fontSize: 10))]) 
               else ElevatedButton.icon(
                 onPressed: () async {
                   setModalState(() => isBroadcasting = true);
@@ -199,7 +203,7 @@ class _ScannerPageState extends State<ScannerPage> {
                   setModalState(() => isBroadcasting = false);
                   if (mounted) {
                     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                      content: Text(success ? "Broadcast Successful to Global Network" : "Broadcast Failed: Check Connection"),
+                      content: Text(success ? "Broadcast Successful to Global Network" : "Broadcast Failed: Check Internet"),
                       backgroundColor: success ? Colors.green : Colors.red,
                     ));
                     if (success) Navigator.pop(context);
@@ -224,7 +228,6 @@ class _ScannerPageState extends State<ScannerPage> {
         MobileScanner(
           controller: _controller, 
           onDetect: (c) { 
-            // PRINCIPAL FIX: Defensive guard for empty barcode list to prevent RangeError crash
             if (c.barcodes.isNotEmpty && c.barcodes.first.rawValue != null) {
               _handleResult(c.barcodes.first.rawValue!); 
             }

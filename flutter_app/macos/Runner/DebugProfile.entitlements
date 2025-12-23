@@ -2,11 +2,14 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <!-- PRODUCTION STANDARD: Sandboxed environment with explicit network client access -->
     <key>com.apple.security.app-sandbox</key>
     <true/>
     <key>com.apple.security.cs.allow-jit</key>
     <true/>
+    <!-- Debugger requires server socket to connect to the iMac's Dart VM -->
+    <key>com.apple.security.network.server</key>
+    <true/>
+    <!-- Nostr relays require outgoing client connections -->
     <key>com.apple.security.network.client</key>
     <true/>
     <key>com.apple.security.device.camera</key>

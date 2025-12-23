@@ -1,8 +1,8 @@
 /**
  * PROJECT SATYA: SECURE IDENTITY BRIDGE
  * =====================================
- * PHASE: 5.9.9 (Final Trinity Baseline)
- * VERSION: 1.5.8
+ * PHASE: 6.6 (Forensic Baseline)
+ * VERSION: 1.6.6
  * DESCRIPTION:
  * Harmonizes hardware signatures for Android, iOS, and macOS.
  */
@@ -16,7 +16,10 @@ class HardwareIdService {
     try {
       if (Platform.isMacOS) {
         final macInfo = await deviceInfo.macOsInfo;
-        return macInfo.systemGUID ?? "macos_stable_id";
+        // systemGUID is the golden standard for sandboxed macOS apps
+        final id = macInfo.systemGUID ?? "macos_stable_static_id";
+        print("SATYA_DEBUG: Hardware ID (macOS): $id");
+        return id;
       } else if (Platform.isIOS) {
         final iosInfo = await deviceInfo.iosInfo;
         return iosInfo.identifierForVendor ?? "ios_stable_id"; 
@@ -29,8 +32,8 @@ class HardwareIdService {
         return baseId;
       }
     } catch (e) {
-      print("SATYA_SECURITY: Fallback active.");
+      print("SATYA_SECURITY: ID Extraction Warning: $e");
     }
-    return "satya_unbound_generic_id";
+    return "satya_unbound_identity";
   }
 }

@@ -55,7 +55,7 @@ pub fn rust_create_identity(label: String) -> Result<SatyaIdentity> {
 pub fn rust_sign_intent(identity_id: String, upi_url: String) -> Result<String> {
     let state = VAULT_STATE.lock().unwrap();
     if let Some((_, vault, _, _)) = &*state {
-        let priv_key = vault.private_keys.get(&identity_id).ok_or_else(|| anyhow!("Key missing"))?;
+        let priv_key = vault.private_keys.get(&identity_id).ok_or_else(|| anyhow!("Key material missing"))?;
         let intent = parse_upi_url(&upi_url)?;
         let payload = IntentPayload {
             version: PROTOCOL_VERSION.to_string(),
@@ -84,7 +84,6 @@ pub fn rust_publish_to_nostr(signed_json: String) -> Result<bool> {
 
     rt.block_on(async {
         let keys = Keys::generate();
-        // nostr-sdk v0.36 requires owned keys for the client.
         let client = Client::new(keys.clone());
 
         client.add_relay("wss://relay.damus.io").await?;
