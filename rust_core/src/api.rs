@@ -1,9 +1,9 @@
 /**
  * PROJECT SATYA: RUST CORE ENGINE
  * ===============================
- * PHASE: 6.5 (The Decentralized Proof)
- * VERSION: 1.6.5
- * STATUS: STABLE (Async Signer Fixed)
+ * PHASE: 6.7 (Resilient Trinity Baseline)
+ * VERSION: 1.6.7
+ * STATUS: STABLE (State Sync Ready)
  */
 
 use crate::persistence::{VaultManager, SatyaVault};
@@ -22,19 +22,20 @@ static VAULT_STATE: Lazy<Mutex<Option<(VaultManager, SatyaVault, String, String)
     Lazy::new(|| Mutex::new(None));
 
 pub fn rust_init_core() -> String {
-    "Satya Core Phase 6.5 Active".to_string()
+    "Satya Core Phase 6.7 Active".to_string()
 }
 
 pub fn rust_initialize_vault(pin: String, hw_id: String, storage_path: String) -> Result<bool> {
     let manager = VaultManager::new(&storage_path);
     let key = VaultKey::from_pin(&pin, b"satya_salt_v1")?;
+    
     match manager.load(&key, hw_id.as_bytes()) {
         Ok(vault) => {
             let mut state = VAULT_STATE.lock().unwrap();
             *state = Some((manager, vault, pin, hw_id));
             Ok(true)
         },
-        Err(e) => Err(anyhow!("Unlock failed: {}", e))
+        Err(e) => Err(anyhow!("{}", e))
     }
 }
 
@@ -55,7 +56,7 @@ pub fn rust_create_identity(label: String) -> Result<SatyaIdentity> {
 pub fn rust_sign_intent(identity_id: String, upi_url: String) -> Result<String> {
     let state = VAULT_STATE.lock().unwrap();
     if let Some((_, vault, _, _)) = &*state {
-        let priv_key = vault.private_keys.get(&identity_id).ok_or_else(|| anyhow!("Key material missing"))?;
+        let priv_key = vault.private_keys.get(&identity_id).ok_or_else(|| anyhow!("Keys missing"))?;
         let intent = parse_upi_url(&upi_url)?;
         let payload = IntentPayload {
             version: PROTOCOL_VERSION.to_string(),
@@ -74,9 +75,7 @@ pub fn rust_sign_intent(identity_id: String, upi_url: String) -> Result<String> 
     } else { Err(anyhow!("Vault Locked")) }
 }
 
-/// PHASE 6.5: Resilient Global Broadcast
 pub fn rust_publish_to_nostr(signed_json: String) -> Result<bool> {
-    // Principal Design: Use multi-threaded runtime to prevent FFI thread deadlock.
     let rt = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .worker_threads(2)
@@ -85,20 +84,13 @@ pub fn rust_publish_to_nostr(signed_json: String) -> Result<bool> {
     rt.block_on(async {
         let keys = Keys::generate();
         let client = Client::new(keys.clone());
-
         client.add_relay("wss://relay.damus.io").await?;
         client.add_relay("wss://nos.lol").await?;
-
-        // 15-second timeout for the network handshake.
         let connect_future = client.connect();
         if let Err(_) = tokio::time::timeout(Duration::from_secs(15), connect_future).await {
-            return Err(anyhow!("Network timeout connecting to relays."));
+            return Err(anyhow!("Relay connection timeout"));
         }
-
-        // PRINCIPAL FIX: sign() is an async method in v0.36. Added .await.
-        let event = EventBuilder::new(Kind::from(29001), signed_json, [])
-            .sign(&keys).await?;
-        
+        let event = EventBuilder::new(Kind::from(29001), signed_json, []).sign(&keys).await?;
         client.send_event(event).await?;
         client.disconnect().await?;
         Ok(true)
@@ -114,6 +106,6 @@ pub fn rust_get_identities() -> Result<Vec<SatyaIdentity>> {
 pub fn rust_scan_qr(raw_qr_string: String) -> Result<String> {
     match parse_upi_url(&raw_qr_string) {
         Ok(intent) => Ok(serde_json::to_string(&intent).unwrap()),
-        Err(e) => Err(anyhow!("QR error: {}", e))
+        Err(e) => Err(anyhow!("QR Error: {}", e))
     }
 }

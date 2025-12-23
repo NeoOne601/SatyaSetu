@@ -1,9 +1,9 @@
 #!/bin/bash
 # PROJECT SATYA: MASTER BUILD SYSTEM
 # =====================================
-# PHASE: 6.5 (The Trinity Final Baseline)
-# VERSION: 1.6.5
-# STATUS: STABLE (No Poisoning)
+# PHASE: 6.7 (Resilient Broadcaster)
+# VERSION: 1.6.7
+# STATUS: STABLE (Trinity Ready)
 
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
@@ -17,7 +17,6 @@ export ANDROID_NDK_HOME="$ANDROID_SDK_ROOT/ndk/$NDK_VERSION"
 ROOT_DIR=$(pwd)
 
 # --- CLEAN ENVIRONMENT ---
-# Purge global Mac variables to prevent Android compiler contamination
 unset SDKROOT
 unset CPATH
 unset C_INCLUDE_PATH
@@ -31,7 +30,7 @@ flutter_rust_bridge_codegen \
 
 cd rust_core || exit 1
 
-# --- ANDROID (Clean) ---
+# --- ANDROID (Pristine) ---
 echo "Building Android Binaries..."
 cargo ndk -t arm64-v8a -o "$ROOT_DIR/flutter_app/android/app/src/main/jniLibs" build --release || exit 1
 
@@ -40,7 +39,7 @@ echo "Building iOS Static Libs..."
 cargo build --release --target aarch64-apple-ios-sim || exit 1
 cp "target/aarch64-apple-ios-sim/release/librust_core.a" "$ROOT_DIR/flutter_app/ios/Runner/librust_core.a"
 
-# --- macOS (Scoped Only) ---
+# --- macOS (Scoped) ---
 echo "Building macOS Native (.dylib)..."
 export SDKROOT=$(xcrun --sdk macosx --show-sdk-path)
 export CPATH="$SDKROOT/usr/include"
@@ -48,5 +47,5 @@ cargo build --release --target aarch64-apple-darwin || exit 1
 cp "target/aarch64-apple-darwin/release/librust_core.dylib" "$ROOT_DIR/flutter_app/macos/librust_core.dylib"
 cp "target/aarch64-apple-darwin/release/librust_core.dylib" "$ROOT_DIR/flutter_app/librust_core.dylib"
 
-echo -e "${GREEN}✓ Phase 6.5 Trinity Build Successful.${NC}"
+echo -e "${GREEN}✓ Phase 6.7 Trinity Build Successful.${NC}"
 exit 0

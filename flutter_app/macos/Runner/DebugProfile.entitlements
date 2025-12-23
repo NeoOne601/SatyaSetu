@@ -6,10 +6,10 @@
     <true/>
     <key>com.apple.security.cs.allow-jit</key>
     <true/>
-    <!-- Debugger requires server socket to connect to the iMac's Dart VM -->
+    <!-- Essential for the iMac Debugger to communicate with the app -->
     <key>com.apple.security.network.server</key>
     <true/>
-    <!-- Nostr relays require outgoing client connections -->
+    <!-- Required for decentralized broadcast (Nostr) -->
     <key>com.apple.security.network.client</key>
     <true/>
     <key>com.apple.security.device.camera</key>
