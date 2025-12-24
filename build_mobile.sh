@@ -1,16 +1,16 @@
 #!/bin/bash
 # PROJECT SATYA: MASTER BUILD SYSTEM
 # =====================================
-# PHASE: 6.7 (Resilient Broadcaster)
-# VERSION: 1.6.7
-# STATUS: STABLE (Trinity Ready)
+# PHASE: 6.8 (Forensic Synchronization)
+# VERSION: 1.6.8
+# STATUS: STABLE (No Poisoning)
 
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
 RED='\033[0;31m'
 NC='\033[0m'
 
-# --- SHARED CONFIG ---
+# --- CONFIG ---
 ANDROID_SDK_ROOT="/Volumes/Apple/Android/sdk"
 NDK_VERSION="28.2.13676358" 
 export ANDROID_NDK_HOME="$ANDROID_SDK_ROOT/ndk/$NDK_VERSION"
@@ -30,7 +30,7 @@ flutter_rust_bridge_codegen \
 
 cd rust_core || exit 1
 
-# --- ANDROID (Pristine) ---
+# --- ANDROID (Clean) ---
 echo "Building Android Binaries..."
 cargo ndk -t arm64-v8a -o "$ROOT_DIR/flutter_app/android/app/src/main/jniLibs" build --release || exit 1
 
@@ -47,5 +47,5 @@ cargo build --release --target aarch64-apple-darwin || exit 1
 cp "target/aarch64-apple-darwin/release/librust_core.dylib" "$ROOT_DIR/flutter_app/macos/librust_core.dylib"
 cp "target/aarch64-apple-darwin/release/librust_core.dylib" "$ROOT_DIR/flutter_app/librust_core.dylib"
 
-echo -e "${GREEN}✓ Phase 6.7 Trinity Build Successful.${NC}"
+echo -e "${GREEN}✓ Phase 6.8 Trinity Build Successful.${NC}"
 exit 0

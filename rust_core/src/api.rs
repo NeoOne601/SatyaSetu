@@ -3,7 +3,7 @@
  * ===============================
  * PHASE: 6.8 (Forensic Synchronization)
  * VERSION: 1.6.8
- * STATUS: STABLE (Native Reset Implemented)
+ * STATUS: STABLE (Native Reset Fixed)
  * DESCRIPTION:
  * Main FFI entry point. Implements Native Atomic Reset to resolve
  * macOS Sandbox filesystem race conditions.
@@ -22,7 +22,6 @@ use std::fs;
 
 pub use crate::domain::UpiIntent;
 
-// Internal State Singleton
 static VAULT_STATE: Lazy<Mutex<Option<(VaultManager, SatyaVault, String, String)>>> = 
     Lazy::new(|| Mutex::new(None));
 
@@ -31,12 +30,11 @@ pub fn rust_init_core() -> String {
 }
 
 /// PRINCIPAL FIX: Explicit Native Reset
-/// Moves the mismatched vault to a backup and purges internal memory.
-/// This ensures all macOS file locks are released before the next session.
+/// Purges memory and renames the directory to bypass macOS lazy-unlinking.
 pub fn rust_reset_vault(storage_path: String) -> Result<bool> {
-    println!("SATYA_RUST: Initiating Native Forensic Purge...");
+    println!("SATYA_RUST: Executing Native Forensic Wipe...");
     
-    // 1. Purge In-Memory State Singleton to release manager handles
+    // 1. Purge In-Memory Singleton to release file handles
     let mut state = VAULT_STATE.lock().unwrap();
     *state = None;
 
@@ -53,10 +51,10 @@ pub fn rust_reset_vault(storage_path: String) -> Result<bool> {
         let mut backup_path = path.clone();
         backup_path.set_extension(format!("{}.mismatch", timestamp));
         
-        // Principal Design: Rename is atomic at the kernel level.
-        // It immediately frees 'satya_vault' for the next cryptographic root.
+        // Principal Design: Rename is atomic. It immediately frees the path
+        // for the fresh cryptographic root, bypassing OS deletion lag.
         fs::rename(&path, &backup_path)?;
-        println!("SATYA_RUST: Vault entry moved to mismatch backup. Path is clean.");
+        println!("SATYA_RUST: Vault entry moved. Primary path is now clean.");
     }
     
     Ok(true)
@@ -102,7 +100,7 @@ pub fn rust_sign_intent(identity_id: String, upi_url: String) -> Result<String> 
             amount_cents: intent.amount.parse::<f64>().ok().map(|a| (a * 100.0) as u64),
             currency: intent.currency,
             metadata: format!("To: {}", intent.name),
-            geo_hash: \"00000\".to_string(),
+            geo_hash: "00000".to_string(),
             counterparty_did: format!("vpa:{}", intent.vpa),
         };
         let payload_json = serde_json::to_string(&payload)?;
@@ -113,7 +111,11 @@ pub fn rust_sign_intent(identity_id: String, upi_url: String) -> Result<String> 
 }
 
 pub fn rust_publish_to_nostr(signed_json: String) -> Result<bool> {
-    let rt = tokio::runtime::Builder::new_multi_thread().enable_all().worker_threads(2).build()?;
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .worker_threads(2)
+        .build()?;
+
     rt.block_on(async {
         let keys = Keys::generate();
         let client = Client::new(keys.clone());
@@ -123,7 +125,9 @@ pub fn rust_publish_to_nostr(signed_json: String) -> Result<bool> {
         if let Err(_) = tokio::time::timeout(Duration::from_secs(15), connect_future).await {
             return Err(anyhow!("Relay connection timeout"));
         }
-        let event = EventBuilder::new(Kind::from(29001), signed_json, []).sign(&keys).await?;
+        let event = EventBuilder::new(Kind::from(29001), signed_json, [])
+            .sign(&keys).await?;
+        
         client.send_event(event).await?;
         client.disconnect().await?;
         Ok(true)
