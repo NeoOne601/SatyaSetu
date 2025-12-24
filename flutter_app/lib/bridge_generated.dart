@@ -15,8 +15,8 @@ abstract class RustCore {
 
   FlutterRustBridgeTaskConstMeta get kRustInitCoreConstMeta;
 
-  /// PRINCIPAL FIX: Explicit Native Reset
-  /// Purges memory and renames the directory to bypass macOS lazy-unlinking.
+  /// PRINCIPAL FIX: Native Forensic Reset
+  /// Renames the mismatched vault to a backup to release macOS filesystem locks.
   Future<bool> rustResetVault({required String storagePath, dynamic hint});
 
   FlutterRustBridgeTaskConstMeta get kRustResetVaultConstMeta;

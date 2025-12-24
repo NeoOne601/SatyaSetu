@@ -3,7 +3,7 @@
  * =====================================
  * PHASE: 6.8 (Forensic Synchronization)
  * VERSION: 1.6.8
- * STATUS: STABLE (Native Reset)
+ * STATUS: STABLE (Native Reset Ready)
  */
 
 import 'dart:io';
@@ -111,7 +111,7 @@ class _UnlockScreenState extends State<UnlockScreen> {
   }
 }
 
-// CONSOLIDATED CLASSES: HomeScreen & ScannerPage
+// CONSOLIDATED CLASSES consolidated for consistency
 class HomeScreen extends StatefulWidget { final VaultService vaultService; final IdentityRepository repo; const HomeScreen({super.key, required this.vaultService, required this.repo}); @override State<HomeScreen> createState() => _HomeScreenState(); }
 class _HomeScreenState extends State<HomeScreen> { List<SatyaIdentity> _identities = []; bool _isSyncing = true; @override void initState() { super.initState(); _refresh(); } Future<void> _refresh() async { setState(() => _isSyncing = true); final list = await widget.repo.getIdentities(); setState(() { _identities = list; _isSyncing = false; }); } Future<void> _addId() async { final c = TextEditingController(text: "Merchant ${DateTime.now().minute}"); final ok = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(title: const Text("New Identity"), content: TextField(controller: c), actions: [TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text("Cancel")), ElevatedButton(onPressed: () => Navigator.pop(ctx, true), child: const Text("Create"))])); if (ok == true) { await widget.vaultService.createNewIdentity(c.text); await _refresh(); } } @override Widget build(BuildContext context) { return Scaffold(appBar: AppBar(title: const Text("IDENTITY LEDGER"), centerTitle: true, actions: [IconButton(icon: const Icon(LucideIcons.plusCircle), onPressed: _addId)]), body: _isSyncing ? const Center(child: CircularProgressIndicator()) : _identities.isEmpty ? Center(child: ElevatedButton.icon(onPressed: _addId, icon: const Icon(LucideIcons.plus), label: const Text("Create First Identity"))) : ListView.builder(padding: const EdgeInsets.all(16), itemCount: _identities.length, itemBuilder: (c, i) => Card(child: ListTile(leading: const Icon(LucideIcons.userCheck, color: Color(0xFF00FFC8)), title: Text(_identities[i].label), subtitle: Text(_identities[i].did, style: const TextStyle(fontSize: 10, color: Colors.white30))))), floatingActionButton: FloatingActionButton(onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => ScannerPage(repo: widget.repo, identities: _identities))), backgroundColor: const Color(0xFF00FFC8), child: const Icon(LucideIcons.scan, color: Colors.black))); } }
 class ScannerPage extends StatefulWidget { final IdentityRepository repo; final List<SatyaIdentity> identities; const ScannerPage({super.key, required this.repo, required this.identities}); @override State<ScannerPage> createState() => _ScannerPageState(); }

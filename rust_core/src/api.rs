@@ -3,10 +3,7 @@
  * ===============================
  * PHASE: 6.8 (Forensic Synchronization)
  * VERSION: 1.6.8
- * STATUS: STABLE (Native Reset Implemented)
- * DESCRIPTION:
- * Main FFI entry point. Implements Native Atomic Reset to resolve
- * macOS Sandbox filesystem race conditions.
+ * STATUS: STABLE (Native Reset Fixed)
  */
 
 use crate::persistence::{VaultManager, SatyaVault};
@@ -29,16 +26,16 @@ pub fn rust_init_core() -> String {
     "Satya Core Phase 6.8 Active".to_string()
 }
 
-/// PRINCIPAL FIX: Explicit Native Reset
-/// Purges memory and renames the directory to bypass macOS lazy-unlinking.
+/// PRINCIPAL FIX: Native Forensic Reset
+/// Renames the mismatched vault to a backup to release macOS filesystem locks.
 pub fn rust_reset_vault(storage_path: String) -> Result<bool> {
-    println!("SATYA_RUST: Initiating Native Forensic Wipe...");
+    println!("SATYA_RUST: Initiating Native Forensic Purge...");
     
     // 1. Purge In-Memory State to release file handles
     let mut state = VAULT_STATE.lock().unwrap();
     *state = None;
 
-    // 2. Perform Atomic Rename/Wipe
+    // 2. Perform Atomic Rename
     let mut path = std::path::PathBuf::from(storage_path);
     path.push("satya_vault");
     
@@ -51,10 +48,9 @@ pub fn rust_reset_vault(storage_path: String) -> Result<bool> {
         let mut backup_path = path.clone();
         backup_path.set_extension(format!("{}.mismatch", timestamp));
         
-        // Kernel-level rename is atomic. It immediately frees the 'satya_vault'
-        // name for the next cryptographic root.
+        // Kernel-level rename is atomic. It immediately clears the path entry.
         fs::rename(&path, &backup_path)?;
-        println!("SATYA_RUST: Vault entry purged via rename strategy.");
+        println!("SATYA_RUST: Vault entry moved to backup. Primary path is clean.");
     }
     
     Ok(true)

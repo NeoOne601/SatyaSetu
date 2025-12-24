@@ -3,7 +3,7 @@
 # =====================================
 # PHASE: 6.8 (Forensic Synchronization)
 # VERSION: 1.6.8
-# STATUS: STABLE (No Poisoning)
+# STATUS: STABLE (Post-Build Sync Integrated)
 
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
@@ -16,7 +16,7 @@ NDK_VERSION="28.2.13676358"
 export ANDROID_NDK_HOME="$ANDROID_SDK_ROOT/ndk/$NDK_VERSION"
 ROOT_DIR=$(pwd)
 
-# --- CLEAN ENVIRONMENT FOR FFI ---
+# --- CLEAN ENVIRONMENT ---
 unset SDKROOT
 unset CPATH
 unset C_INCLUDE_PATH
@@ -30,14 +30,21 @@ flutter_rust_bridge_codegen \
 
 cd rust_core || exit 1
 
-# --- ANDROID (Strictly Scoped) ---
+# --- ANDROID ---
 echo "Building Android Binaries..."
 cargo ndk -t arm64-v8a -o "$ROOT_DIR/flutter_app/android/app/src/main/jniLibs" build --release || exit 1
 
 # --- iOS ---
 echo "Building iOS Static Libs..."
+# Build for iOS Simulator (Apple Silicon) - arm64 works for both sim and device on Apple Silicon
 cargo build --release --target aarch64-apple-ios-sim || exit 1
-cp "target/aarch64-apple-ios-sim/release/librust_core.a" "$ROOT_DIR/flutter_app/ios/Runner/librust_core.a"
+
+# Create universal directory and copy (Xcode expects this path)
+echo "Deploying iOS binary..."
+mkdir -p "target/universal/release"
+cp "target/aarch64-apple-ios-sim/release/librust_core.a" "target/universal/release/librust_core.a"
+cp "target/universal/release/librust_core.a" "$ROOT_DIR/flutter_app/ios/Runner/librust_core.a"
+echo "iOS binary deployed"
 
 # --- macOS (Scoped) ---
 echo "Building macOS Native (.dylib)..."

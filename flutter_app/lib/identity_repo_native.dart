@@ -2,6 +2,7 @@
  * PROJECT SATYA: SECURE IDENTITY BRIDGE
  * =====================================
  * PHASE: 6.8 (Forensic Synchronization)
+ * STATUS: STABLE (Bundle-Aware Loader)
  */
 
 import 'identity_domain.dart';
@@ -27,20 +28,20 @@ class IOSLoader implements RustLoaderStrategy {
 class MacOSLoader implements RustLoaderStrategy {
   @override
   DynamicLibrary loadLibrary() {
-    // PRINCIPAL FIX: Smarter search path for sandboxed macOS apps
+    // PRINCIPAL FIX: Priority given to the sandboxed Frameworks bundle
     final executableDir = File(Platform.resolvedExecutable).parent.path;
     final paths = [
       'librust_core.dylib',
       'macos/librust_core.dylib',
-      '$executableDir/../Frameworks/librust_core.dylib', // Production Bundle
-      '$executableDir/librust_core.dylib',              // Local Dev Run
+      '$executableDir/../Frameworks/librust_core.dylib', // The valid bundle path
+      '$executableDir/librust_core.dylib',              // Direct execution fallback
     ];
     for (var path in paths) {
       if (File(path).existsSync() || path == 'librust_core.dylib') {
         try { return DynamicLibrary.open(path); } catch (_) {}
       }
     }
-    throw UnsupportedError('Rust binary missing. Ensure it is copied to macos/ folder.');
+    throw UnsupportedError('Rust binary missing. Library must be in Contents/Frameworks/.');
   }
 }
 
@@ -87,7 +88,10 @@ class IdentityRepoNative implements IdentityRepository {
 
   @override
   Future<String> signIntent(String identityId, String upiUrl) async {
-    try { return await api.rustSignIntent(identityId: identityId, upiUrl: upiUrl); } catch (e) { return '{"error": "$e"}'; }
+    try { 
+      // PRINCIPAL FIX: Synchronized naming with bridge codegen (upiUrl)
+      return await api.rustSignIntent(identityId: identityId, upiUrl: upiUrl); 
+    } catch (e) { return '{"error": "$e"}'; }
   }
 
   @override
