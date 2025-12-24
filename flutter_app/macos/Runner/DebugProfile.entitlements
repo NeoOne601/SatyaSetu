@@ -6,10 +6,10 @@
     <true/>
     <key>com.apple.security.cs.allow-jit</key>
     <true/>
-    <!-- Essential for iMac DevTools to communicate with the app -->
+    <!-- RESTORED: Allows the iMac DevTools to communicate with the sandboxed app -->
     <key>com.apple.security.network.server</key>
     <true/>
-    <!-- Required for decentralized broadcast (Nostr) -->
+    <!-- Required for decentralized relay broadcasting (Nostr) -->
     <key>com.apple.security.network.client</key>
     <true/>
     <key>com.apple.security.device.camera</key>

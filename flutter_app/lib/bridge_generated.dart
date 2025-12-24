@@ -15,7 +15,8 @@ abstract class RustCore {
 
   FlutterRustBridgeTaskConstMeta get kRustInitCoreConstMeta;
 
-  /// NEW: Explicit Native Reset to handle macOS Sandbox File Locks
+  /// PRINCIPAL FIX: Explicit Native Reset
+  /// Purges memory state and renames the vault directory to bypass OS-level locks.
   Future<bool> rustResetVault({required String storagePath, dynamic hint});
 
   FlutterRustBridgeTaskConstMeta get kRustResetVaultConstMeta;

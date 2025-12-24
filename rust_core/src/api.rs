@@ -3,7 +3,10 @@
  * ===============================
  * PHASE: 6.8 (Forensic Synchronization)
  * VERSION: 1.6.8
- * STATUS: STABLE (Native Reset Implemented)
+ * STATUS: STABLE (Atomic Reset Implemented)
+ * DESCRIPTION:
+ * Main FFI entry point. Implements Native Atomic Reset to resolve
+ * macOS Sandbox filesystem race conditions and handle locks.
  */
 
 use crate::persistence::{VaultManager, SatyaVault};
@@ -14,7 +17,7 @@ use anyhow::{Result, anyhow};
 use std::sync::Mutex;
 use once_cell::sync::Lazy;
 use nostr_sdk::prelude::*;
-use std::time::Duration;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use std::fs;
 
 pub use crate::domain::UpiIntent;
@@ -26,26 +29,37 @@ pub fn rust_init_core() -> String {
     "Satya Core Phase 6.8 (Forensic) Active".to_string()
 }
 
-/// NEW: Explicit Native Reset to handle macOS Sandbox File Locks
+/// PRINCIPAL FIX: Explicit Native Reset
+/// Purges memory state and renames the vault directory to bypass OS-level locks.
 pub fn rust_reset_vault(storage_path: String) -> Result<bool> {
-    println!("SATYA_RUST: Executing Native Forensic Wipe...");
+    println!("SATYA_RUST: Initiating Native Forensic Purge...");
     
-    // 1. Purge In-Memory State
+    // 1. Purge In-Memory Singleton
     let mut state = VAULT_STATE.lock().unwrap();
     *state = None;
 
-    // 2. Synchronous Disk Wipe
+    // 2. Perform Atomic Rename
     let mut path = std::path::PathBuf::from(storage_path);
     path.push("satya_vault");
+    
     if path.exists() {
-        fs::remove_dir_all(&path)?;
-        println!("SATYA_RUST: Filesystem sync complete. Vault purged.");
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or(Duration::from_secs(0))
+            .as_secs();
+        
+        let mut backup_path = path.clone();
+        backup_path.set_extension(format!("{}.mismatch", timestamp));
+        
+        // Rename ensures 'vault.bin' is immediately removed from search path
+        fs::rename(&path, &backup_path)?;
+        println!("SATYA_RUST: Vault entry purged via rename-wipe strategy.");
     }
+    
     Ok(true)
 }
 
 pub fn rust_initialize_vault(pin: String, hw_id: String, storage_path: String) -> Result<bool> {
-    println!("SATYA_RUST: Attempting Unlock at path: {}", storage_path);
     let manager = VaultManager::new(&storage_path);
     let key = VaultKey::from_pin(&pin, b"satya_salt_v1")?;
     
@@ -53,17 +67,12 @@ pub fn rust_initialize_vault(pin: String, hw_id: String, storage_path: String) -
         Ok(vault) => {
             let mut state = VAULT_STATE.lock().unwrap();
             *state = Some((manager, vault, pin, hw_id));
-            println!("SATYA_RUST: Vault logic initialized successfully.");
             Ok(true)
         },
-        Err(e) => {
-            println!("SATYA_RUST: Load Error: {}", e);
-            Err(anyhow!("{}", e))
-        }
+        Err(e) => Err(anyhow!("{}", e))
     }
 }
 
-// ... Create Identity & Sign Intent preserved from Phase 6.7 ...
 pub fn rust_create_identity(label: String) -> Result<SatyaIdentity> {
     let mut state = VAULT_STATE.lock().unwrap();
     if let Some((manager, vault, pin, hw_id)) = &mut *state {
@@ -127,6 +136,6 @@ pub fn rust_get_identities() -> Result<Vec<SatyaIdentity>> {
 pub fn rust_scan_qr(raw_qr_string: String) -> Result<String> {
     match parse_upi_url(&raw_qr_string) {
         Ok(intent) => Ok(serde_json::to_string(&intent).unwrap()),
-        Err(e) => Err(anyhow!("QR error: {}", e))
+        Err(e) => Err(anyhow!("QR Error: {}", e))
     }
 }

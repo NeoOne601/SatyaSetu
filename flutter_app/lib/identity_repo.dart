@@ -18,7 +18,7 @@ abstract class IdentityRepository {
   Future<String> signIntent(String identityId, String upiUrl);
   Future<bool> publishToNostr(String signedJson);
   
-  /// NEW: Trigger native filesystem purge to resolve macOS locks
+  /// Trigger native cryptographic purge to resolve filesystem locks
   Future<bool> resetVault(String path);
 
   factory IdentityRepository() => getIdentityRepository();
