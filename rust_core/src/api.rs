@@ -3,7 +3,7 @@
  * ===============================
  * PHASE: 6.8 (Forensic Synchronization)
  * VERSION: 1.6.8
- * STATUS: STABLE (Native Reset Fixed)
+ * STATUS: STABLE (Native Reset Implemented)
  * DESCRIPTION:
  * Main FFI entry point. Implements Native Atomic Reset to resolve
  * macOS Sandbox filesystem race conditions.
@@ -26,15 +26,15 @@ static VAULT_STATE: Lazy<Mutex<Option<(VaultManager, SatyaVault, String, String)
     Lazy::new(|| Mutex::new(None));
 
 pub fn rust_init_core() -> String {
-    "Satya Core Phase 6.8 (Forensic) Active".to_string()
+    "Satya Core Phase 6.8 Active".to_string()
 }
 
 /// PRINCIPAL FIX: Explicit Native Reset
 /// Purges memory and renames the directory to bypass macOS lazy-unlinking.
 pub fn rust_reset_vault(storage_path: String) -> Result<bool> {
-    println!("SATYA_RUST: Executing Native Forensic Wipe...");
+    println!("SATYA_RUST: Initiating Native Forensic Wipe...");
     
-    // 1. Purge In-Memory Singleton to release file handles
+    // 1. Purge In-Memory State to release file handles
     let mut state = VAULT_STATE.lock().unwrap();
     *state = None;
 
@@ -51,10 +51,10 @@ pub fn rust_reset_vault(storage_path: String) -> Result<bool> {
         let mut backup_path = path.clone();
         backup_path.set_extension(format!("{}.mismatch", timestamp));
         
-        // Principal Design: Rename is atomic. It immediately frees the path
-        // for the fresh cryptographic root, bypassing OS deletion lag.
+        // Kernel-level rename is atomic. It immediately frees the 'satya_vault'
+        // name for the next cryptographic root.
         fs::rename(&path, &backup_path)?;
-        println!("SATYA_RUST: Vault entry moved. Primary path is now clean.");
+        println!("SATYA_RUST: Vault entry purged via rename strategy.");
     }
     
     Ok(true)
@@ -111,11 +111,7 @@ pub fn rust_sign_intent(identity_id: String, upi_url: String) -> Result<String> 
 }
 
 pub fn rust_publish_to_nostr(signed_json: String) -> Result<bool> {
-    let rt = tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .worker_threads(2)
-        .build()?;
-
+    let rt = tokio::runtime::Builder::new_multi_thread().enable_all().worker_threads(2).build()?;
     rt.block_on(async {
         let keys = Keys::generate();
         let client = Client::new(keys.clone());
@@ -127,7 +123,6 @@ pub fn rust_publish_to_nostr(signed_json: String) -> Result<bool> {
         }
         let event = EventBuilder::new(Kind::from(29001), signed_json, [])
             .sign(&keys).await?;
-        
         client.send_event(event).await?;
         client.disconnect().await?;
         Ok(true)

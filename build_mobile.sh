@@ -16,7 +16,7 @@ NDK_VERSION="28.2.13676358"
 export ANDROID_NDK_HOME="$ANDROID_SDK_ROOT/ndk/$NDK_VERSION"
 ROOT_DIR=$(pwd)
 
-# --- CLEAN ENVIRONMENT ---
+# --- CLEAN ENVIRONMENT FOR FFI ---
 unset SDKROOT
 unset CPATH
 unset C_INCLUDE_PATH
@@ -30,7 +30,7 @@ flutter_rust_bridge_codegen \
 
 cd rust_core || exit 1
 
-# --- ANDROID (Clean) ---
+# --- ANDROID (Strictly Scoped) ---
 echo "Building Android Binaries..."
 cargo ndk -t arm64-v8a -o "$ROOT_DIR/flutter_app/android/app/src/main/jniLibs" build --release || exit 1
 
@@ -41,11 +41,21 @@ cp "target/aarch64-apple-ios-sim/release/librust_core.a" "$ROOT_DIR/flutter_app/
 
 # --- macOS (Scoped) ---
 echo "Building macOS Native (.dylib)..."
+# Apply Mac headers ONLY for this specific block
 export SDKROOT=$(xcrun --sdk macosx --show-sdk-path)
 export CPATH="$SDKROOT/usr/include"
 cargo build --release --target aarch64-apple-darwin || exit 1
+unset SDKROOT CPATH
+
+echo "Deploying to Flutter App..."
 cp "target/aarch64-apple-darwin/release/librust_core.dylib" "$ROOT_DIR/flutter_app/macos/librust_core.dylib"
 cp "target/aarch64-apple-darwin/release/librust_core.dylib" "$ROOT_DIR/flutter_app/librust_core.dylib"
+
+# Post-build copy to app bundle (ensures library is always available)
+if [ -f "$ROOT_DIR/flutter_app/copy_rust_lib.sh" ]; then
+  echo "Copying Rust library to app bundle..."
+  cd "$ROOT_DIR/flutter_app" && ./copy_rust_lib.sh
+fi
 
 echo -e "${GREEN}✓ Phase 6.8 Trinity Build Successful.${NC}"
 exit 0

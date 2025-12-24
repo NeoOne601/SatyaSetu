@@ -27,17 +27,20 @@ class IOSLoader implements RustLoaderStrategy {
 class MacOSLoader implements RustLoaderStrategy {
   @override
   DynamicLibrary loadLibrary() {
+    // PRINCIPAL FIX: Smarter search path for sandboxed macOS apps
+    final executableDir = File(Platform.resolvedExecutable).parent.path;
     final paths = [
       'librust_core.dylib',
       'macos/librust_core.dylib',
-      '${File(Platform.resolvedExecutable).parent.path}/../Frameworks/librust_core.dylib',
+      '$executableDir/../Frameworks/librust_core.dylib', // Production Bundle
+      '$executableDir/librust_core.dylib',              // Local Dev Run
     ];
     for (var path in paths) {
       if (File(path).existsSync() || path == 'librust_core.dylib') {
         try { return DynamicLibrary.open(path); } catch (_) {}
       }
     }
-    throw UnsupportedError('Rust binary missing.');
+    throw UnsupportedError('Rust binary missing. Ensure it is copied to macos/ folder.');
   }
 }
 
@@ -58,13 +61,7 @@ class IdentityRepoNative implements IdentityRepository {
 
   @override
   Future<bool> resetVault(String path) async {
-    try { 
-      // Call the new forensic reset function
-      return await api.rustResetVault(storagePath: path); 
-    } catch (e) { 
-      print("SATYA_FFI_RESET: Internal error during reset: $e");
-      return false; 
-    }
+    try { return await api.rustResetVault(storagePath: path); } catch (e) { return false; }
   }
 
   @override
