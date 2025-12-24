@@ -15,6 +15,11 @@ abstract class RustCore {
 
   FlutterRustBridgeTaskConstMeta get kRustInitCoreConstMeta;
 
+  /// NEW: Explicit Native Reset to handle macOS Sandbox File Locks
+  Future<bool> rustResetVault({required String storagePath, dynamic hint});
+
+  FlutterRustBridgeTaskConstMeta get kRustResetVaultConstMeta;
+
   Future<bool> rustInitializeVault(
       {required String pin,
       required String hwId,
@@ -87,6 +92,24 @@ class RustCoreImpl implements RustCore {
       const FlutterRustBridgeTaskConstMeta(
         debugName: "rust_init_core",
         argNames: [],
+      );
+
+  Future<bool> rustResetVault({required String storagePath, dynamic hint}) {
+    var arg0 = _platform.api2wire_String(storagePath);
+    return _platform.executeNormal(FlutterRustBridgeTask(
+      callFfi: (port_) => _platform.inner.wire_rust_reset_vault(port_, arg0),
+      parseSuccessData: _wire2api_bool,
+      parseErrorData: _wire2api_FrbAnyhowException,
+      constMeta: kRustResetVaultConstMeta,
+      argValues: [storagePath],
+      hint: hint,
+    ));
+  }
+
+  FlutterRustBridgeTaskConstMeta get kRustResetVaultConstMeta =>
+      const FlutterRustBridgeTaskConstMeta(
+        debugName: "rust_reset_vault",
+        argNames: ["storagePath"],
       );
 
   Future<bool> rustInitializeVault(
@@ -370,6 +393,20 @@ class RustCoreWire implements FlutterRustBridgeWireBase {
   );
   late final _wire_rust_init_core =
       _wire_rust_init_corePtr.asFunction<void Function(int)>();
+
+  void wire_rust_reset_vault(
+    int port_,
+    ffi.Pointer<wire_uint_8_list> storage_path,
+  ) {
+    return _wire_rust_reset_vault(port_, storage_path);
+  }
+
+  late final _wire_rust_reset_vaultPtr = _lookup<
+      ffi.NativeFunction<
+          ffi.Void Function(ffi.Int64,
+              ffi.Pointer<wire_uint_8_list>)>>('wire_rust_reset_vault');
+  late final _wire_rust_reset_vault = _wire_rust_reset_vaultPtr
+      .asFunction<void Function(int, ffi.Pointer<wire_uint_8_list>)>();
 
   void wire_rust_initialize_vault(
     int port_,

@@ -7,6 +7,11 @@ pub extern "C" fn wire_rust_init_core(port_: i64) {
 }
 
 #[no_mangle]
+pub extern "C" fn wire_rust_reset_vault(port_: i64, storage_path: *mut wire_uint_8_list) {
+    wire_rust_reset_vault_impl(port_, storage_path)
+}
+
+#[no_mangle]
 pub extern "C" fn wire_rust_initialize_vault(
     port_: i64,
     pin: *mut wire_uint_8_list,

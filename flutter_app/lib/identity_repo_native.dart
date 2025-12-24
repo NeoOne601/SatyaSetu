@@ -1,9 +1,7 @@
 /**
  * PROJECT SATYA: SECURE IDENTITY BRIDGE
  * =====================================
- * PHASE: 6.0 (The Decentralized Proof)
- * VERSION: 1.6.0
- * STATUS: STABLE (Nostr Mapping Enabled)
+ * PHASE: 6.8 (Forensic Synchronization)
  */
 
 import 'identity_domain.dart';
@@ -59,6 +57,11 @@ class IdentityRepoNative implements IdentityRepository {
   }
 
   @override
+  Future<bool> resetVault(String path) async {
+    try { return await api.rustResetVault(storagePath: path); } catch (e) { return false; }
+  }
+
+  @override
   Future<SatyaIdentity> createIdentity({String label = "Primary"}) async {
     try {
       final result = await api.rustCreateIdentity(label: label);
@@ -86,13 +89,7 @@ class IdentityRepoNative implements IdentityRepository {
 
   @override
   Future<bool> publishToNostr(String signedJson) async {
-    try { 
-      // Real FFI call to Phase 6 Rust Engine
-      return await api.rustPublishToNostr(signedJson: signedJson); 
-    } catch (e) { 
-      print("SATYA_FFI_NOSTR: $e");
-      return false; 
-    }
+    try { return await api.rustPublishToNostr(signedJson: signedJson); } catch (e) { return false; }
   }
 }
 

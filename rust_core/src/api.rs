@@ -1,9 +1,9 @@
 /**
  * PROJECT SATYA: RUST CORE ENGINE
  * ===============================
- * PHASE: 6.7 (Resilient Trinity Baseline)
- * VERSION: 1.6.7
- * STATUS: STABLE (State Sync Ready)
+ * PHASE: 6.8 (Forensic Synchronization)
+ * VERSION: 1.6.8
+ * STATUS: STABLE (Native Reset Implemented)
  */
 
 use crate::persistence::{VaultManager, SatyaVault};
@@ -15,6 +15,7 @@ use std::sync::Mutex;
 use once_cell::sync::Lazy;
 use nostr_sdk::prelude::*;
 use std::time::Duration;
+use std::fs;
 
 pub use crate::domain::UpiIntent;
 
@@ -22,10 +23,29 @@ static VAULT_STATE: Lazy<Mutex<Option<(VaultManager, SatyaVault, String, String)
     Lazy::new(|| Mutex::new(None));
 
 pub fn rust_init_core() -> String {
-    "Satya Core Phase 6.7 Active".to_string()
+    "Satya Core Phase 6.8 (Forensic) Active".to_string()
+}
+
+/// NEW: Explicit Native Reset to handle macOS Sandbox File Locks
+pub fn rust_reset_vault(storage_path: String) -> Result<bool> {
+    println!("SATYA_RUST: Executing Native Forensic Wipe...");
+    
+    // 1. Purge In-Memory State
+    let mut state = VAULT_STATE.lock().unwrap();
+    *state = None;
+
+    // 2. Synchronous Disk Wipe
+    let mut path = std::path::PathBuf::from(storage_path);
+    path.push("satya_vault");
+    if path.exists() {
+        fs::remove_dir_all(&path)?;
+        println!("SATYA_RUST: Filesystem sync complete. Vault purged.");
+    }
+    Ok(true)
 }
 
 pub fn rust_initialize_vault(pin: String, hw_id: String, storage_path: String) -> Result<bool> {
+    println!("SATYA_RUST: Attempting Unlock at path: {}", storage_path);
     let manager = VaultManager::new(&storage_path);
     let key = VaultKey::from_pin(&pin, b"satya_salt_v1")?;
     
@@ -33,12 +53,17 @@ pub fn rust_initialize_vault(pin: String, hw_id: String, storage_path: String) -
         Ok(vault) => {
             let mut state = VAULT_STATE.lock().unwrap();
             *state = Some((manager, vault, pin, hw_id));
+            println!("SATYA_RUST: Vault logic initialized successfully.");
             Ok(true)
         },
-        Err(e) => Err(anyhow!("{}", e))
+        Err(e) => {
+            println!("SATYA_RUST: Load Error: {}", e);
+            Err(anyhow!("{}", e))
+        }
     }
 }
 
+// ... Create Identity & Sign Intent preserved from Phase 6.7 ...
 pub fn rust_create_identity(label: String) -> Result<SatyaIdentity> {
     let mut state = VAULT_STATE.lock().unwrap();
     if let Some((manager, vault, pin, hw_id)) = &mut *state {
@@ -76,11 +101,7 @@ pub fn rust_sign_intent(identity_id: String, upi_url: String) -> Result<String> 
 }
 
 pub fn rust_publish_to_nostr(signed_json: String) -> Result<bool> {
-    let rt = tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .worker_threads(2)
-        .build()?;
-
+    let rt = tokio::runtime::Builder::new_multi_thread().enable_all().worker_threads(2).build()?;
     rt.block_on(async {
         let keys = Keys::generate();
         let client = Client::new(keys.clone());
@@ -106,6 +127,6 @@ pub fn rust_get_identities() -> Result<Vec<SatyaIdentity>> {
 pub fn rust_scan_qr(raw_qr_string: String) -> Result<String> {
     match parse_upi_url(&raw_qr_string) {
         Ok(intent) => Ok(serde_json::to_string(&intent).unwrap()),
-        Err(e) => Err(anyhow!("QR Error: {}", e))
+        Err(e) => Err(anyhow!("QR error: {}", e))
     }
 }

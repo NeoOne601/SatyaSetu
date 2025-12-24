@@ -6,7 +6,7 @@
     <true/>
     <key>com.apple.security.cs.allow-jit</key>
     <true/>
-    <!-- Essential for the iMac Debugger to communicate with the app -->
+    <!-- Essential for iMac DevTools to communicate with the app -->
     <key>com.apple.security.network.server</key>
     <true/>
     <!-- Required for decentralized broadcast (Nostr) -->

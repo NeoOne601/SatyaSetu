@@ -34,6 +34,22 @@ fn wire_rust_init_core_impl(port_: MessagePort) {
         move || move |task_callback| Result::<_, ()>::Ok(rust_init_core()),
     )
 }
+fn wire_rust_reset_vault_impl(
+    port_: MessagePort,
+    storage_path: impl Wire2Api<String> + UnwindSafe,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap::<_, _, _, bool, _>(
+        WrapInfo {
+            debug_name: "rust_reset_vault",
+            port: Some(port_),
+            mode: FfiCallMode::Normal,
+        },
+        move || {
+            let api_storage_path = storage_path.wire2api();
+            move |task_callback| rust_reset_vault(api_storage_path)
+        },
+    )
+}
 fn wire_rust_initialize_vault_impl(
     port_: MessagePort,
     pin: impl Wire2Api<String> + UnwindSafe,
