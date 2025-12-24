@@ -3,10 +3,10 @@
  * ===============================
  * PHASE: 6.8 (Forensic Synchronization)
  * VERSION: 1.6.8
- * STATUS: STABLE (Atomic Reset Implemented)
+ * STATUS: STABLE (Native Reset Implemented)
  * DESCRIPTION:
  * Main FFI entry point. Implements Native Atomic Reset to resolve
- * macOS Sandbox filesystem race conditions and handle locks.
+ * macOS Sandbox filesystem race conditions.
  */
 
 use crate::persistence::{VaultManager, SatyaVault};
@@ -22,6 +22,7 @@ use std::fs;
 
 pub use crate::domain::UpiIntent;
 
+// Internal State Singleton
 static VAULT_STATE: Lazy<Mutex<Option<(VaultManager, SatyaVault, String, String)>>> = 
     Lazy::new(|| Mutex::new(None));
 
@@ -30,15 +31,16 @@ pub fn rust_init_core() -> String {
 }
 
 /// PRINCIPAL FIX: Explicit Native Reset
-/// Purges memory state and renames the vault directory to bypass OS-level locks.
+/// Moves the mismatched vault to a backup and purges internal memory.
+/// This ensures all macOS file locks are released before the next session.
 pub fn rust_reset_vault(storage_path: String) -> Result<bool> {
     println!("SATYA_RUST: Initiating Native Forensic Purge...");
     
-    // 1. Purge In-Memory Singleton
+    // 1. Purge In-Memory State Singleton to release manager handles
     let mut state = VAULT_STATE.lock().unwrap();
     *state = None;
 
-    // 2. Perform Atomic Rename
+    // 2. Perform Atomic Rename/Wipe
     let mut path = std::path::PathBuf::from(storage_path);
     path.push("satya_vault");
     
@@ -51,9 +53,10 @@ pub fn rust_reset_vault(storage_path: String) -> Result<bool> {
         let mut backup_path = path.clone();
         backup_path.set_extension(format!("{}.mismatch", timestamp));
         
-        // Rename ensures 'vault.bin' is immediately removed from search path
+        // Principal Design: Rename is atomic at the kernel level.
+        // It immediately frees 'satya_vault' for the next cryptographic root.
         fs::rename(&path, &backup_path)?;
-        println!("SATYA_RUST: Vault entry purged via rename-wipe strategy.");
+        println!("SATYA_RUST: Vault entry moved to mismatch backup. Path is clean.");
     }
     
     Ok(true)
@@ -99,7 +102,7 @@ pub fn rust_sign_intent(identity_id: String, upi_url: String) -> Result<String> 
             amount_cents: intent.amount.parse::<f64>().ok().map(|a| (a * 100.0) as u64),
             currency: intent.currency,
             metadata: format!("To: {}", intent.name),
-            geo_hash: "00000".to_string(),
+            geo_hash: \"00000\".to_string(),
             counterparty_did: format!("vpa:{}", intent.vpa),
         };
         let payload_json = serde_json::to_string(&payload)?;

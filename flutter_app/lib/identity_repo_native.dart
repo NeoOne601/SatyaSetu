@@ -58,7 +58,13 @@ class IdentityRepoNative implements IdentityRepository {
 
   @override
   Future<bool> resetVault(String path) async {
-    try { return await api.rustResetVault(storagePath: path); } catch (e) { return false; }
+    try { 
+      // Call the new forensic reset function
+      return await api.rustResetVault(storagePath: path); 
+    } catch (e) { 
+      print("SATYA_FFI_RESET: Internal error during reset: $e");
+      return false; 
+    }
   }
 
   @override

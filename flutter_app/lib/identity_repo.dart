@@ -2,7 +2,6 @@
  * PROJECT SATYA: SECURE IDENTITY BRIDGE
  * =====================================
  * PHASE: 6.8 (Forensic Synchronization)
- * VERSION: 1.6.8
  */
 
 import 'identity_domain.dart';
@@ -18,7 +17,7 @@ abstract class IdentityRepository {
   Future<String> signIntent(String identityId, String upiUrl);
   Future<bool> publishToNostr(String signedJson);
   
-  /// Trigger native cryptographic purge to resolve filesystem locks
+  /// Trigger native cryptographic purge and rename to resolve filesystem locks
   Future<bool> resetVault(String path);
 
   factory IdentityRepository() => getIdentityRepository();
