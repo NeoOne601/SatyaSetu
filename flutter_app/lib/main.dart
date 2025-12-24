@@ -54,7 +54,14 @@ class _UnlockScreenState extends State<UnlockScreen> {
   bool _showReset = false;
 
   @override
-  void initState() { super.initState(); _pinController.clear(); _focusNode.requestFocus(); }
+  void initState() {
+    super.initState();
+    _pinController.clear();
+    // Delay focus request until after first frame to avoid RenderBox layout error
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _focusNode.requestFocus();
+    });
+  }
 
   Future<void> _attemptUnlock() async {
     if (_pinController.text.length < 6) return;
