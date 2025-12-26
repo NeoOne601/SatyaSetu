@@ -28,5 +28,9 @@
 	<string>MainMenu</string>
 	<key>NSPrincipalClass</key>
 	<string>NSApplication</string>
+	<key>NSCameraUsageDescription</key>
+	<string>SatyaSetu needs camera access to detect visual anchors for adaptive UI</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>SatyaSetu may use microphone for video recording features</string>
 </dict>
 </plist>

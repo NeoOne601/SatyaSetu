@@ -1,14 +1,14 @@
 # FILE: flutter_app/pubspec.yaml
-# VERSION: 1.7.1
-# PHASE: Phase 7.1 (The Adaptive Interface)
+# VERSION: 1.7.2
+# PHASE: Phase 7.2 (Object Classification)
 # DESCRIPTION: 
-# Baselined project dependencies with new additions for Vision AI.
-# Adds camera hardware support and runtime permission management.
+# Baselined dependencies for SatyaSetu.
+# Adds Google ML Kit for cross-platform object recognition and classification.
 
 name: flutter_app
 description: "SatyaSetu: Privacy-First Identity Bridge"
 publish_to: 'none'
-version: 1.7.1+1
+version: 1.7.2+1
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -21,21 +21,23 @@ dependencies:
   flutter_rust_bridge: ^1.82.6
   ffi: ^2.0.1
   
-  # --- UI & EXPERIENCE BASELINE ---
+  # --- UI & PERSISTENCE BASELINE ---
   google_fonts: ^5.0.0
   lucide_icons: ^0.257.0
   cupertino_icons: ^1.0.2
-  
-  # --- PERSISTENCE & SYSTEM BASELINE ---
   path_provider: ^2.1.2
   device_info_plus: ^10.1.0
   mobile_scanner: ^7.1.4
 
-  # --- PHASE 7.1 ADDITIONS: VISION & HARDWARE ---
-  # Reason: Required for real-time camera stream and object detection
+  # --- PHASE 7: VISION & AI ---
+  # Drives physical camera hardware on Android/iOS
   camera: ^0.11.0+2
-  # Reason: Required for cross-platform permission requests (Android/iOS)
+  # macOS camera support (AVFoundation wrapper for desktop testing)
+  camera_macos: ^0.0.9
+  # Manages runtime permissions for camera and storage
   permission_handler: ^11.3.1
+  # MediaPipe/TFLite inference engine for object recognition
+  google_mlkit_object_detection: ^0.13.0
 
 dev_dependencies:
   flutter_test:
