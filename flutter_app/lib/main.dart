@@ -1,12 +1,13 @@
 /**
  * FILE: flutter_app/lib/main.dart
- * VERSION: 1.7.4
+ * VERSION: 1.7.6
  * PHASE: Phase 7.2 (The Adaptive Interface)
  * DESCRIPTION: 
- * Main entry point of SatyaSetu with Vision-Aware UI morphing.
+ * Main entry point of SatyaSetu with Active Intent Recognition.
  * PURPOSE:
- * Integrates the live lens into the identity ledger. 
- * FIXED: Satisfied 'cameraMode' requirement for macOS 0.0.9 compatibility.
+ * Displays real-time 'Detection Chips' on top of the camera feed.
+ * Enables users to explicitly select which physical object to register.
+ * FIXED: 'onCameraInizialized' (plugin specific spelling) and 'cameraMode' sync.
  */
 
 import 'dart:io';
@@ -28,11 +29,7 @@ void main() async {
   final vaultService = VaultService(repo);
   final visionService = VisionService();
   
-  runApp(SatyaApp(
-    vaultService: vaultService, 
-    repo: repo, 
-    visionService: visionService
-  ));
+  runApp(SatyaApp(vaultService: vaultService, repo: repo, visionService: visionService));
 }
 
 class SatyaApp extends StatelessWidget {
@@ -40,12 +37,7 @@ class SatyaApp extends StatelessWidget {
   final IdentityRepository repo;
   final VisionService visionService;
   
-  const SatyaApp({
-    super.key, 
-    required this.vaultService, 
-    required this.repo, 
-    required this.visionService
-  });
+  const SatyaApp({super.key, required this.vaultService, required this.repo, required this.visionService});
   
   @override
   Widget build(BuildContext context) {
@@ -62,7 +54,6 @@ class SatyaApp extends StatelessWidget {
   }
 }
 
-/// SECURE ENTRY: Authenticates vault before morphing the UI.
 class UnlockScreen extends StatefulWidget {
   final VaultService vaultService;
   final IdentityRepository repo;
@@ -87,9 +78,7 @@ class _UnlockScreenState extends State<UnlockScreen> {
       final directory = await getApplicationSupportDirectory();
       final hwId = await HardwareIdService.getDeviceId();
       final success = await widget.vaultService.unlock(_pinController.text, hwId, directory.path);
-      
       if (success && mounted) {
-        // Prepare Vision Brain AFTER valid secure entry
         await widget.visionService.initialize();
         Navigator.of(context).pushReplacement(MaterialPageRoute(
           builder: (_) => HomeScreen(vaultService: widget.vaultService, repo: widget.repo, visionService: widget.visionService)
@@ -126,8 +115,7 @@ class _UnlockScreenState extends State<UnlockScreen> {
             ),
             const SizedBox(height: 32),
             _isLoading ? const CircularProgressIndicator() : ElevatedButton(onPressed: _attemptUnlock, child: const Text("Unlock Identity")),
-            if (_showReset) 
-              TextButton(onPressed: () async {
+            if (_showReset) TextButton(onPressed: () async {
                 final dir = await getApplicationSupportDirectory();
                 await widget.repo.resetVault(dir.path);
                 setState(() => _showReset = false);
@@ -139,7 +127,6 @@ class _UnlockScreenState extends State<UnlockScreen> {
   }
 }
 
-/// ADAPTIVE PORTAL: Morphs between Identity Ledger and the Vision stream.
 class HomeScreen extends StatefulWidget {
   final VaultService vaultService;
   final IdentityRepository repo;
@@ -150,7 +137,8 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   List<SatyaIdentity> _identities = [];
-  RecognizedIntent _currentIntent = RecognizedIntent.none;
+  List<DetectionCandidate> _activeCandidates = [];
+  RecognizedIntent _selectedIntent = RecognizedIntent.none;
   bool _isSyncing = true;
 
   @override
@@ -158,15 +146,11 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _refresh();
     
-    // UI REBUILD: Re-renders when the lens is ready.
     widget.visionService.onInitialized = () { if (mounted) setState(() {}); };
     
-    // ADAPTIVE LISTENER: Morphs the UI in response to recognized physical objects.
-    widget.visionService.intentStream.listen((intent) {
-      if (mounted) {
-        setState(() => _currentIntent = intent);
-        HapticFeedback.mediumImpact();
-      }
+    // ACTIVE SCANNER: Listen for multiple detection candidates
+    widget.visionService.candidatesStream.listen((candidates) {
+      if (mounted) setState(() => _activeCandidates = candidates);
     });
   }
 
@@ -176,45 +160,47 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() { _identities = list; _isSyncing = false; });
   }
 
-  /// PERSONA ADOPTION: Generates a contextual DID from the root.
-  Future<void> _adoptPersona(String type) async {
-    await widget.vaultService.createNewIdentity(type);
-    setState(() => _currentIntent = RecognizedIntent.none); 
+  Future<void> _confirmPersona(DetectionCandidate candidate) async {
+    await widget.vaultService.createNewIdentity(candidate.label);
+    setState(() {
+      _selectedIntent = RecognizedIntent.none;
+      _activeCandidates.clear();
+    });
     await _refresh();
+    HapticFeedback.vibrate();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("SATYA PORTAL"), centerTitle: true,
+        title: const Text("SATYA SCANNER"), centerTitle: true,
         actions: [IconButton(icon: const Icon(LucideIcons.refreshCw), onPressed: _refresh)] 
       ),
       body: Stack(
         children: [
-          // THE VISION LAYER: Active background camera preview
+          // LIVE LENS: The constant eye of the application
           Positioned.fill(
             child: Opacity(
-              opacity: 0.15, 
+              opacity: 0.3,
               child: Platform.isMacOS 
-                // PRINCIPAL FIX: Satisfied 'cameraMode' requirement for version 0.0.9
                 ? CameraMacOSView(
                     cameraMode: CameraMacOSMode.photo, 
                     onCameraInizialized: (controller) {
                       widget.visionService.macController = controller;
-                      print("SATYA_VISION: iMac Camera Active. FaceTime Light Green.");
                     },
                   )
                 : (widget.visionService.mobileController?.value.isInitialized ?? false)
                   ? CameraPreview(widget.visionService.mobileController!)
-                  : const Center(child: Text("Preparing Visual Lens...")),
+                  : const Center(child: Text("Initializing Vision Brain...")),
             ),
           ),
 
-          // THE LEDGER LAYER
+          // THE SMART OVERLAY: Displays detected candidates for selection
           Column(
             children: [
-              if (_currentIntent != RecognizedIntent.none) _buildAdaptiveCard(),
+              if (_activeCandidates.isNotEmpty) _buildScannerOverlay(),
+              
               Expanded(
                 child: _isSyncing 
                   ? const Center(child: CircularProgressIndicator()) 
@@ -235,59 +221,51 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      floatingActionButton: _buildAdaptiveMockPanel(),
     );
   }
 
-  /// UI COMPONENT: The Adaptive Morph Card.
-  Widget _buildAdaptiveCard() {
-    String title = "Context Detected";
-    IconData icon = LucideIcons.eye;
-    
-    switch (_currentIntent) {
-      case RecognizedIntent.rideHailing: title = "Commuter Persona"; icon = LucideIcons.car; break;
-      case RecognizedIntent.householdAsset: title = "Home Manager"; icon = LucideIcons.utensils; break;
-      case RecognizedIntent.education: title = "Academic Persona"; icon = LucideIcons.bookOpen; break;
-      case RecognizedIntent.laborRepair: title = "Technician Persona"; icon = LucideIcons.wrench; break;
-      default: break;
-    }
-    
+  /// UI COMPONENT: The horizontal scanner that shows what the camera 'sees'.
+  Widget _buildScannerOverlay() {
     return Container(
-      margin: const EdgeInsets.all(16), padding: const EdgeInsets.all(24),
+      height: 120,
+      margin: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(vertical: 16),
       decoration: BoxDecoration(
-        color: const Color(0xFF00FFC8).withOpacity(0.9), 
+        color: Colors.black87,
         borderRadius: BorderRadius.circular(24),
-        boxShadow: [BoxShadow(color: Colors.black45, blurRadius: 10)]
+        border: Border.all(color: const Color(0xFF00FFC8), width: 1)
       ),
-      child: Row(
+      child: Column(
         children: [
-          CircleAvatar(backgroundColor: Colors.black, child: Icon(icon, color: const Color(0xFF00FFC8), size: 24)),
-          const SizedBox(width: 16),
-          Expanded(child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black, fontSize: 16)),
-              const Text("Visual anchor recognized. Adopt persona?", style: TextStyle(color: Colors.black54, fontSize: 11)),
-            ],
-          )),
-          ElevatedButton(onPressed: () => _adoptPersona(title), child: const Text("Adopt")),
-          IconButton(icon: const Icon(LucideIcons.x, color: Colors.black), onPressed: () => setState(() => _currentIntent = RecognizedIntent.none))
+          const Text("DETECTED OBJECTS (TAP TO REGISTER)", style: TextStyle(fontSize: 9, letterSpacing: 2, color: Color(0xFF00FFC8))),
+          const SizedBox(height: 12),
+          Expanded(
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              itemCount: _activeCandidates.length,
+              itemBuilder: (c, i) => _buildCandidateChip(_activeCandidates[i]),
+            ),
+          ),
         ],
       ),
     );
   }
 
-  /// DEV TOOLS: Manual persona triggers for restricted hardware.
-  Widget _buildAdaptiveMockPanel() {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        FloatingActionButton.small(heroTag: "m1", onPressed: () => widget.visionService.mockDetection(RecognizedIntent.education), backgroundColor: Colors.purple, child: const Icon(LucideIcons.bookOpen)),
-        const SizedBox(height: 8),
-        FloatingActionButton.small(heroTag: "m2", onPressed: () => widget.visionService.mockDetection(RecognizedIntent.householdAsset), backgroundColor: Colors.blue, child: const Icon(LucideIcons.utensils)),
-        const SizedBox(height: 8),
-        FloatingActionButton(heroTag: "m3", onPressed: _refresh, backgroundColor: const Color(0xFF00FFC8), child: const Icon(LucideIcons.refreshCw, color: Colors.black)),
-      ],
+  Widget _buildCandidateChip(DetectionCandidate candidate) {
+    IconData icon = LucideIcons.box;
+    if (candidate.intent == RecognizedIntent.rideHailing) icon = LucideIcons.car;
+    if (candidate.intent == RecognizedIntent.education) icon = LucideIcons.bookOpen;
+    if (candidate.intent == RecognizedIntent.householdAsset) icon = LucideIcons.utensils;
+
+    return Padding(
+      padding: const EdgeInsets.only(right: 12),
+      child: ActionChip(
+        avatar: Icon(icon, size: 16, color: Colors.black),
+        backgroundColor: const Color(0xFF00FFC8),
+        label: Text("${candidate.label} (${(candidate.confidence * 100).toInt()}%)", style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 12)),
+        onPressed: () => _confirmPersona(candidate),
+      ),
     );
   }
 }
