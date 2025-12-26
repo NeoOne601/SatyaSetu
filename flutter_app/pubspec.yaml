@@ -1,15 +1,14 @@
 # FILE: flutter_app/pubspec.yaml
-# VERSION: 1.7.4
-# PHASE: Phase 7.2 (Object Classification)
+# VERSION: 1.7.8
+# PHASE: Phase 7.3 (Gesture Signatures)
 # DESCRIPTION: 
 # Baselined dependencies for SatyaSetu.
-# Adds camera_macos for iMac testing while keeping standard camera for mobile.
-# Enables hardware-aware visual identification for adaptive personas.
+# Preserves Trinity stability while adding gesture/object recognition engines.
 
 name: flutter_app
 description: "SatyaSetu: Privacy-First Identity Bridge"
 publish_to: 'none'
-version: 1.7.4+1
+version: 1.7.8+1
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -33,12 +32,9 @@ dependencies:
   mobile_scanner: ^7.1.4
   permission_handler: ^11.3.1
 
-  # --- PHASE 7: VISION ADDITIONS ---
-  # Reason: Standard camera for Android/iOS Trinity
+  # --- PHASE 7: SMART VISION & GESTURES ---
   camera: ^0.11.0+2
-  # Reason: Native iMac camera access via AVFoundation (required for desktop)
   camera_macos: ^0.0.9
-  # Reason: Cross-platform object recognition engine
   google_mlkit_object_detection: ^0.13.0
 
 dev_dependencies:

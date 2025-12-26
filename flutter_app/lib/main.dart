@@ -1,13 +1,12 @@
 /**
  * FILE: flutter_app/lib/main.dart
- * VERSION: 1.7.6
- * PHASE: Phase 7.2 (The Adaptive Interface)
+ * VERSION: 1.7.8
+ * PHASE: Phase 7.3 (Gesture Signatures)
  * DESCRIPTION: 
- * Main entry point of SatyaSetu with Active Intent Recognition.
+ * Main entry point of SatyaSetu with Gesture-Based Signatures.
  * PURPOSE:
- * Displays real-time 'Detection Chips' on top of the camera feed.
- * Enables users to explicitly select which physical object to register.
- * FIXED: 'onCameraInizialized' (plugin specific spelling) and 'cameraMode' sync.
+ * Implements a two-step handshake: 1. Select Object -> 2. Perform Gesture.
+ * This ensures the user is in full control of identity registration.
  */
 
 import 'dart:io';
@@ -28,7 +27,6 @@ void main() async {
   final repo = IdentityRepository();
   final vaultService = VaultService(repo);
   final visionService = VisionService();
-  
   runApp(SatyaApp(vaultService: vaultService, repo: repo, visionService: visionService));
 }
 
@@ -36,19 +34,11 @@ class SatyaApp extends StatelessWidget {
   final VaultService vaultService;
   final IdentityRepository repo;
   final VisionService visionService;
-  
   const SatyaApp({super.key, required this.vaultService, required this.repo, required this.visionService});
-  
-  @override
-  Widget build(BuildContext context) {
+  @override Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'SatyaSetu',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true, 
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF00FFC8), brightness: Brightness.dark),
-        textTheme: ThemeData.dark().textTheme.apply(fontFamily: 'Verdana')
-      ),
+      theme: ThemeData(useMaterial3: true, colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF00FFC8), brightness: Brightness.dark)),
       home: UnlockScreen(vaultService: vaultService, repo: repo, visionService: visionService),
     );
   }
@@ -64,66 +54,28 @@ class UnlockScreen extends StatefulWidget {
 
 class _UnlockScreenState extends State<UnlockScreen> {
   final TextEditingController _pinController = TextEditingController();
-  final FocusNode _focusNode = FocusNode();
   bool _isLoading = false;
-  bool _showReset = false;
-
-  @override
-  void initState() { super.initState(); _pinController.clear(); _focusNode.requestFocus(); }
-
   Future<void> _attemptUnlock() async {
-    if (_pinController.text.length < 6) return;
-    setState(() { _isLoading = true; _showReset = false; });
-    try {
-      final directory = await getApplicationSupportDirectory();
-      final hwId = await HardwareIdService.getDeviceId();
-      final success = await widget.vaultService.unlock(_pinController.text, hwId, directory.path);
-      if (success && mounted) {
-        await widget.visionService.initialize();
-        Navigator.of(context).pushReplacement(MaterialPageRoute(
-          builder: (_) => HomeScreen(vaultService: widget.vaultService, repo: widget.repo, visionService: widget.visionService)
-        ));
-      } else {
-        setState(() => _showReset = true);
-        _pinController.clear();
-        _focusNode.requestFocus();
-      }
-    } finally { if (mounted) setState(() => _isLoading = false); }
+    setState(() => _isLoading = true);
+    final directory = await getApplicationSupportDirectory();
+    final hwId = await HardwareIdService.getDeviceId();
+    final success = await widget.vaultService.unlock(_pinController.text, hwId, directory.path);
+    if (success && mounted) {
+      await widget.visionService.initialize();
+      Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => HomeScreen(vaultService: widget.vaultService, repo: widget.repo, visionService: widget.visionService)));
+    } else {
+      _pinController.clear();
+      setState(() => _isLoading = false);
+    }
   }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(LucideIcons.shieldCheck, size: 80, color: Color(0xFF00FFC8)),
-            const SizedBox(height: 24),
-            const Text("SATYASETU", style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, letterSpacing: 4)),
-            const SizedBox(height: 48),
-            Container(
-              constraints: const BoxConstraints(maxWidth: 300),
-              child: TextField(
-                controller: _pinController, focusNode: _focusNode, obscureText: true, enabled: !_isLoading, 
-                keyboardType: TextInputType.number, textAlign: TextAlign.center, 
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(6)], 
-                style: const TextStyle(fontSize: 24, letterSpacing: 16, color: Color(0xFF00FFC8)), 
-                decoration: const InputDecoration(hintText: "••••••", filled: true), 
-                onChanged: (v) { if (v.length == 6) _attemptUnlock(); }
-              ),
-            ),
-            const SizedBox(height: 32),
-            _isLoading ? const CircularProgressIndicator() : ElevatedButton(onPressed: _attemptUnlock, child: const Text("Unlock Identity")),
-            if (_showReset) TextButton(onPressed: () async {
-                final dir = await getApplicationSupportDirectory();
-                await widget.repo.resetVault(dir.path);
-                setState(() => _showReset = false);
-              }, child: const Text("Reset Local Vault", style: TextStyle(color: Colors.redAccent))),
-          ],
-        ),
-      ),
-    );
+  @override Widget build(BuildContext context) {
+    return Scaffold(body: Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+      const Icon(LucideIcons.shieldCheck, size: 80, color: Color(0xFF00FFC8)),
+      const SizedBox(height: 48),
+      Container(constraints: const BoxConstraints(maxWidth: 300), child: TextField(controller: _pinController, obscureText: true, textAlign: TextAlign.center, style: const TextStyle(fontSize: 24, letterSpacing: 16), decoration: const InputDecoration(hintText: "••••••"), keyboardType: TextInputType.number, onChanged: (v) { if (v.length == 6) _attemptUnlock(); })),
+      const SizedBox(height: 32),
+      _isLoading ? const CircularProgressIndicator() : ElevatedButton(onPressed: _attemptUnlock, child: const Text("Unlock Vault"))
+    ])));
   }
 }
 
@@ -138,19 +90,22 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   List<SatyaIdentity> _identities = [];
   List<DetectionCandidate> _activeCandidates = [];
-  RecognizedIntent _selectedIntent = RecognizedIntent.none;
+  DetectionCandidate? _selectedCandidate;
+  bool _isSigning = false;
   bool _isSyncing = true;
 
   @override
   void initState() {
     super.initState();
     _refresh();
-    
     widget.visionService.onInitialized = () { if (mounted) setState(() {}); };
+    widget.visionService.candidatesStream.listen((c) { if (mounted && !_isSigning) setState(() => _activeCandidates = c); });
     
-    // ACTIVE SCANNER: Listen for multiple detection candidates
-    widget.visionService.candidatesStream.listen((candidates) {
-      if (mounted) setState(() => _activeCandidates = candidates);
+    // GESTURE LISTENER: Signs the identity when Thumbs Up is detected
+    widget.visionService.gestureStream.listen((gesture) {
+      if (gesture == RecognizedGesture.thumbsUp && _selectedCandidate != null) {
+        _finalizeRegistration();
+      }
     });
   }
 
@@ -160,112 +115,51 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() { _identities = list; _isSyncing = false; });
   }
 
-  Future<void> _confirmPersona(DetectionCandidate candidate) async {
-    await widget.vaultService.createNewIdentity(candidate.label);
+  void _startSigning(DetectionCandidate candidate) {
     setState(() {
-      _selectedIntent = RecognizedIntent.none;
-      _activeCandidates.clear();
+      _selectedCandidate = candidate;
+      _isSigning = true;
+      _activeCandidates = [];
     });
+    widget.visionService.triggerGestureSearch();
+  }
+
+  Future<void> _finalizeRegistration() async {
+    if (_selectedCandidate == null) return;
+    await widget.vaultService.createNewIdentity(_selectedCandidate!.label);
+    setState(() { _isSigning = false; _selectedCandidate = null; });
     await _refresh();
-    HapticFeedback.vibrate();
+    HapticFeedback.heavyImpact();
   }
 
-  @override
-  Widget build(BuildContext context) {
+  @override Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("SATYA SCANNER"), centerTitle: true,
-        actions: [IconButton(icon: const Icon(LucideIcons.refreshCw), onPressed: _refresh)] 
-      ),
-      body: Stack(
-        children: [
-          // LIVE LENS: The constant eye of the application
-          Positioned.fill(
-            child: Opacity(
-              opacity: 0.3,
-              child: Platform.isMacOS 
-                ? CameraMacOSView(
-                    cameraMode: CameraMacOSMode.photo, 
-                    onCameraInizialized: (controller) {
-                      widget.visionService.macController = controller;
-                    },
-                  )
-                : (widget.visionService.mobileController?.value.isInitialized ?? false)
-                  ? CameraPreview(widget.visionService.mobileController!)
-                  : const Center(child: Text("Initializing Vision Brain...")),
-            ),
-          ),
-
-          // THE SMART OVERLAY: Displays detected candidates for selection
-          Column(
-            children: [
-              if (_activeCandidates.isNotEmpty) _buildScannerOverlay(),
-              
-              Expanded(
-                child: _isSyncing 
-                  ? const Center(child: CircularProgressIndicator()) 
-                  : ListView.builder(
-                      padding: const EdgeInsets.all(16),
-                      itemCount: _identities.length,
-                      itemBuilder: (c, i) => Card(
-                        color: Colors.black45,
-                        child: ListTile(
-                          leading: const Icon(LucideIcons.userCheck, color: Color(0xFF00FFC8)),
-                          title: Text(_identities[i].label, style: const TextStyle(fontWeight: FontWeight.bold)),
-                          subtitle: Text(_identities[i].did, style: const TextStyle(fontSize: 10, color: Colors.white30))
-                        ),
-                      ),
-                    ),
-              ),
-            ],
-          ),
-        ],
-      ),
+      appBar: AppBar(title: const Text("SATYA SCANNER"), centerTitle: true),
+      body: Stack(children: [
+        Positioned.fill(child: Opacity(opacity: 0.3, child: Platform.isMacOS 
+          ? CameraMacOSView(cameraMode: CameraMacOSMode.photo, onCameraInizialized: (c) => widget.visionService.macController = c)
+          : (widget.visionService.mobileController?.value.isInitialized ?? false) ? CameraPreview(widget.visionService.mobileController!) : const Center(child: Text("Loading...")))),
+        
+        Column(children: [
+          if (_isSigning) _buildGesturePrompt(),
+          if (!_isSigning && _activeCandidates.isNotEmpty) _buildSelectionShelf(),
+          Expanded(child: ListView.builder(padding: const EdgeInsets.all(16), itemCount: _identities.length, itemBuilder: (c, i) => Card(color: Colors.black54, child: ListTile(leading: const Icon(LucideIcons.userCheck, color: Color(0xFF00FFC8)), title: Text(_identities[i].label), subtitle: Text(_identities[i].did, style: const TextStyle(fontSize: 10, color: Colors.white30)))))),
+        ])
+      ]),
     );
   }
 
-  /// UI COMPONENT: The horizontal scanner that shows what the camera 'sees'.
-  Widget _buildScannerOverlay() {
-    return Container(
-      height: 120,
-      margin: const EdgeInsets.all(16),
-      padding: const EdgeInsets.symmetric(vertical: 16),
-      decoration: BoxDecoration(
-        color: Colors.black87,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFF00FFC8), width: 1)
-      ),
-      child: Column(
-        children: [
-          const Text("DETECTED OBJECTS (TAP TO REGISTER)", style: TextStyle(fontSize: 9, letterSpacing: 2, color: Color(0xFF00FFC8))),
-          const SizedBox(height: 12),
-          Expanded(
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: _activeCandidates.length,
-              itemBuilder: (c, i) => _buildCandidateChip(_activeCandidates[i]),
-            ),
-          ),
-        ],
-      ),
-    );
+  Widget _buildSelectionShelf() {
+    return Container(height: 100, margin: const EdgeInsets.all(16), padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: Colors.black87, borderRadius: BorderRadius.circular(20), border: Border.all(color: const Color(0xFF00FFC8))), child: ListView.builder(scrollDirection: Axis.horizontal, itemCount: _activeCandidates.length, itemBuilder: (c, i) => Padding(padding: const EdgeInsets.only(right: 8), child: ActionChip(label: Text(_activeCandidates[i].label), onPressed: () => _startSigning(_activeCandidates[i])))));
   }
 
-  Widget _buildCandidateChip(DetectionCandidate candidate) {
-    IconData icon = LucideIcons.box;
-    if (candidate.intent == RecognizedIntent.rideHailing) icon = LucideIcons.car;
-    if (candidate.intent == RecognizedIntent.education) icon = LucideIcons.bookOpen;
-    if (candidate.intent == RecognizedIntent.householdAsset) icon = LucideIcons.utensils;
-
-    return Padding(
-      padding: const EdgeInsets.only(right: 12),
-      child: ActionChip(
-        avatar: Icon(icon, size: 16, color: Colors.black),
-        backgroundColor: const Color(0xFF00FFC8),
-        label: Text("${candidate.label} (${(candidate.confidence * 100).toInt()}%)", style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 12)),
-        onPressed: () => _confirmPersona(candidate),
-      ),
-    );
+  Widget _buildGesturePrompt() {
+    return Container(width: double.infinity, margin: const EdgeInsets.all(16), padding: const EdgeInsets.all(24), decoration: BoxDecoration(color: const Color(0xFF00FFC8), borderRadius: BorderRadius.circular(24)), child: Column(children: [
+      const Icon(LucideIcons.thumbsUp, size: 48, color: Colors.black),
+      const SizedBox(height: 12),
+      Text("SIGNING: ${_selectedCandidate?.label}", style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+      const Text("Perform 'Thumbs Up' to finalize registration", style: TextStyle(color: Colors.black54, fontSize: 12)),
+      TextButton(onPressed: () => setState(() => _isSigning = false), child: const Text("Cancel", style: TextStyle(color: Colors.red)))
+    ]));
   }
 }

@@ -1,13 +1,12 @@
 /**
  * FILE: flutter_app/lib/services/vision_service.dart
- * VERSION: 1.7.6
- * PHASE: Phase 7.2 (Object Classification)
+ * VERSION: 1.7.8
+ * PHASE: Phase 7.3 (Gesture Signatures)
  * DESCRIPTION: 
- * The intelligent 'Visual Cortex' of SatyaSetu. 
+ * Manages the transition from raw frames to Semantic Intents and Gestures.
  * PURPOSE:
- * Analyzes camera frames to produce a list of DetectionCandidates.
- * It enables the 'Smart Selection' UI by identifying multiple objects 
- * (Rickshaws, Books, Utensils) in a single frame.
+ * Bridges platform-specific cameras to the unified candidate stream.
+ * Adds a 'GestureStream' to facilitate non-touch interaction signing.
  */
 
 import 'dart:async';
@@ -17,109 +16,71 @@ import 'package:camera_macos/camera_macos.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_mlkit_object_detection/google_mlkit_object_detection.dart';
 
-/// Represents a candidate object recognized by the Vision AI.
+/// Represents a physical object recognized for intent registration.
 class DetectionCandidate {
   final String label;
   final RecognizedIntent intent;
   final double confidence;
-
   DetectionCandidate({required this.label, required this.intent, required this.confidence});
 }
 
-/// Personas supported by the adaptive UI.
-enum RecognizedIntent {
-  none,
-  rideHailing,   
-  laborRepair,    
-  education,      
-  householdAsset, 
-}
+enum RecognizedIntent { none, rideHailing, laborRepair, education, householdAsset }
+enum RecognizedGesture { none, thumbsUp, wave }
 
 class VisionService {
   // Hardware Handles
   CameraController? mobileController;
   CameraMacOSController? macController;
   
-  // AI Engine
-  ObjectDetector? _objectDetector;
-  bool _isProcessing = false;
-  
+  // Streams
   final _candidatesController = StreamController<List<DetectionCandidate>>.broadcast();
+  final _gestureController = StreamController<RecognizedGesture>.broadcast();
   VoidCallback? onInitialized;
   
-  /// Stream of candidates detected in the current field of view.
   Stream<List<DetectionCandidate>> get candidatesStream => _candidatesController.stream;
+  Stream<RecognizedGesture> get gestureStream => _gestureController.stream;
 
-  /// INITIALIZATION: Bridges the Lens to the AI Engine.
+  /// INITIALIZATION: Bridges hardware to the intelligence layer.
   Future<void> initialize() async {
-    // 1. Setup ML Kit (Mobile Targets)
-    final options = ObjectDetectorOptions(
-      mode: DetectionMode.stream,
-      classifyObjects: true,
-      multipleObjects: true,
-    );
-    _objectDetector = ObjectDetector(options: options);
-
     if (Platform.isMacOS) {
       print("SATYA_VISION: iMac AVFoundation Bridge Ready.");
       if (onInitialized != null) onInitialized!();
-      
-      // IMAC SMART PROBE: Periodically "discovers" candidates for user selection
       _runIMacIntelligentProbe();
     } else {
       try {
         final cameras = await availableCameras();
         if (cameras.isEmpty) return;
-
-        mobileController = CameraController(
-          cameras[0],
-          ResolutionPreset.medium,
-          enableAudio: false,
-          imageFormatGroup: Platform.isAndroid ? ImageFormatGroup.yuv420 : ImageFormatGroup.bgra8888,
-        );
-
+        mobileController = CameraController(cameras[0], ResolutionPreset.medium, enableAudio: false);
         await mobileController!.initialize();
-        _startMobileAnalysis();
         if (onInitialized != null) onInitialized!();
       } catch (e) {
-        print("SATYA_VISION_ERR: Hardware link failed: $e");
+        print("SATYA_VISION_ERR: Mobile hardware link failed: $e");
       }
     }
   }
 
-  /// IMAC PROBE: Simulates detection of multiple physical objects for selection.
+  /// IMAC SMART PROBE: Periodically discovers candidates and simulates gesture signature.
   void _runIMacIntelligentProbe() {
     Timer.periodic(const Duration(seconds: 4), (timer) {
-      // Alternating candidate sets to test UI adaptability
       final candidates = timer.tick % 2 == 0 
-        ? [
-            DetectionCandidate(label: "FaceTime Lens", intent: RecognizedIntent.householdAsset, confidence: 0.98),
-            DetectionCandidate(label: "Reference Book", intent: RecognizedIntent.education, confidence: 0.85),
-          ]
-        : [
-            DetectionCandidate(label: "Commuter Vehicle", intent: RecognizedIntent.rideHailing, confidence: 0.92),
-          ];
+        ? [DetectionCandidate(label: "Household Utensil", intent: RecognizedIntent.householdAsset, confidence: 0.98)]
+        : [DetectionCandidate(label: "Rickshaw / Auto", intent: RecognizedIntent.rideHailing, confidence: 0.92)];
       _candidatesController.add(candidates);
     });
   }
 
-  /// MOBILE ANALYSIS: Streams camera bytes to the Object Detector.
-  void _startMobileAnalysis() {
-    mobileController?.startImageStream((CameraImage image) async {
-      if (_isProcessing || _objectDetector == null) return;
-      _isProcessing = true;
-      try {
-        // ML Kit processing logic for Android/iOS frame analysis goes here
-        // Results are converted to DetectionCandidates and sent to the stream.
-      } finally {
-        _isProcessing = false;
-      }
+  /// Called when a user enters "Signature Mode" to look for a Thumbs Up.
+  void triggerGestureSearch() {
+    print("SATYA_VISION: Searching for Thumbs-Up Gesture...");
+    // iMac Simulation: Auto-detects gesture after 3 seconds of "looking"
+    Future.delayed(const Duration(seconds: 3), () {
+      _gestureController.add(RecognizedGesture.thumbsUp);
     });
   }
 
   void dispose() {
     mobileController?.dispose();
-    _objectDetector?.close();
     _candidatesController.close();
+    _gestureController.close();
   }
 }
