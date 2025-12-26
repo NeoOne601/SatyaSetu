@@ -3,7 +3,7 @@
 # PHASE: Phase 7.2 (Object Classification)
 # DESCRIPTION: 
 # Baselined dependencies for SatyaSetu.
-# Adds Google ML Kit for cross-platform object recognition and classification.
+# Adds camera_macos for iMac testing while keeping standard camera for mobile.
 
 name: flutter_app
 description: "SatyaSetu: Privacy-First Identity Bridge"
@@ -30,13 +30,13 @@ dependencies:
   mobile_scanner: ^7.1.4
 
   # --- PHASE 7: VISION & AI ---
-  # Drives physical camera hardware on Android/iOS
+  # Standard camera for Android/iOS Trinity
   camera: ^0.11.0+2
-  # macOS camera support (AVFoundation wrapper for desktop testing)
+  # Community plugin for iMac/macOS Desktop testing
   camera_macos: ^0.0.9
-  # Manages runtime permissions for camera and storage
+  # Permission management for mobile targets
   permission_handler: ^11.3.1
-  # MediaPipe/TFLite inference engine for object recognition
+  # MediaPipe/TFLite inference engine for object detection
   google_mlkit_object_detection: ^0.13.0
 
 dev_dependencies:
