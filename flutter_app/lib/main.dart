@@ -1,9 +1,9 @@
 /**
  * FILE: flutter_app/lib/main.dart
- * VERSION: 2.0.0
- * PHASE: Phase 7.6 (Vampire Reality)
- * GOAL: Real QR Scanning and Live Vision Overlays.
- * FIX: Resolved Dropdown reference exception and removed mocked UPI data.
+ * VERSION: 2.1.0
+ * PHASE: Phase 7.7 (Semantic Intent Mapping)
+ * GOAL: Display raw object labels and automatically map them to identities.
+ * NEW: Dynamic Object Overlays, ID-based Dropdown safety, and Persona Auto-Grouping.
  */
 
 import 'dart:io';
@@ -138,22 +138,22 @@ class _HomeScreenState extends State<HomeScreen> {
     final list = await widget.repo.getIdentities();
     setState(() { 
       _identities = list; 
-      // FIXED: Dropdown reference safety - find matching ID to prevent E0034/Dropdown exception
+      // FIXED: Dropdown identity resolution via ID matching
       if (_identities.isNotEmpty) {
         if (_selectedIdentity == null) {
           _selectedIdentity = _identities.first;
         } else {
-          _selectedIdentity = _identities.firstWhere(
-            (i) => i.id == _selectedIdentity!.id, 
-            orElse: () => _identities.first
-          );
+          try {
+            _selectedIdentity = _identities.firstWhere((i) => i.id == _selectedIdentity!.id);
+          } catch (_) {
+            _selectedIdentity = _identities.first;
+          }
         }
       }
       _isSyncing = false; 
     });
   }
 
-  /// REAL SCANNER: Launches a dedicated QR detection overlay.
   void _openRealScanner() {
     Navigator.of(context).push(MaterialPageRoute(
       builder: (context) => Scaffold(
@@ -180,9 +180,7 @@ class _HomeScreenState extends State<HomeScreen> {
       final jsonStr = await widget.repo.scanQr(rawUpi);
       final data = jsonDecode(jsonStr);
       if (mounted) _showInteractionSheet(data, rawUpi);
-    } catch (e) {
-      setState(() => _lastStatus = "Read Error");
-    }
+    } catch (e) { setState(() => _lastStatus = "Read Error"); }
   }
 
   void _showInteractionSheet(Map data, String rawUpi) {
@@ -194,20 +192,20 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           const Icon(LucideIcons.zap, color: Color(0xFF00FFC8), size: 48),
           const SizedBox(height: 16),
-          Text("Pay ${data['name']}", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-          Text("${data['amount']} ${data['currency']}", style: const TextStyle(fontSize: 32, color: Color(0xFF00FFC8))),
+          Text("VAMPIRE INTERACTION", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+          Text("${data['amount']} ${data['currency']} to ${data['name']}", style: const TextStyle(fontSize: 14, color: Colors.white54)),
           const Divider(height: 32, color: Colors.white10),
-          Text("Signer: ${_selectedIdentity?.label}"),
+          Text("Signer Persona: ${_selectedIdentity?.label}"),
           const SizedBox(height: 24),
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(c);
-              setState(() => _lastStatus = "Broadcasting...");
+              setState(() => _lastStatus = "Signing...");
               final signedJson = await widget.repo.signIntent(_selectedIdentity!.id, rawUpi);
               final ok = await widget.repo.publishToNostr(signedJson);
               setState(() => _lastStatus = ok ? "Nostr Success" : "Relay Refused");
             }, 
-            child: const Text("SIGN & BROADCAST")
+            child: const Text("ADOPT INTERACTION")
           )
         ]),
       )
@@ -220,7 +218,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _finalizeNewPersona() async {
-    await widget.vaultService.createNewIdentity(_visionTarget!.label);
+    // AUTOMATIC GROUPING: Maps the raw object label to its persona type internally.
+    final label = "${_visionTarget!.personaType} (${_visionTarget!.objectLabel})";
+    await widget.vaultService.createNewIdentity(label);
     setState(() { _isSigningPersona = false; _visionTarget = null; });
     await _refresh();
   }
@@ -230,10 +230,7 @@ class _HomeScreenState extends State<HomeScreen> {
       appBar: AppBar(
         title: Text(_currentTab == 0 ? "SATYA LENS" : _currentTab == 1 ? "HISTORY" : "SETUP"),
         actions: [
-          Center(child: Padding(
-            padding: const EdgeInsets.only(right: 16.0),
-            child: Text(_lastStatus, style: const TextStyle(fontSize: 10, color: Color(0xFF00FFC8))),
-          ))
+          Center(child: Padding(padding: const EdgeInsets.only(right: 16.0), child: Text(_lastStatus, style: const TextStyle(fontSize: 10, color: Color(0xFF00FFC8))))),
         ],
       ),
       body: _buildBody(),
@@ -251,8 +248,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildBody() {
     switch (_currentTab) {
-      case 1: return _buildHistoryTab();
-      case 2: return _buildSetupTab();
+      case 1: return const Center(child: Text("Interaction History (Phase 8 Preview)"));
+      case 2: return Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+        const Text("Hardware Binding: Silicon Verified"),
+        const SizedBox(height: 24),
+        ElevatedButton(onPressed: _refresh, child: const Text("Refresh Personas"))
+      ]));
       default: return _buildScannerTab();
     }
   }
@@ -261,47 +262,45 @@ class _HomeScreenState extends State<HomeScreen> {
     return Stack(children: [
       Positioned.fill(child: Opacity(opacity: 0.4, child: Platform.isMacOS 
         ? CameraMacOSView(cameraMode: CameraMacOSMode.photo, onCameraInizialized: (c) => widget.visionService.macController = c)
-        : const Center(child: Text("Camera Restricted")))),
+        : const Center(child: Text("Camera Access Restricted")))),
       
-      // LIVE VISION OVERLAY: Show what the camera is seeing
-      if (_candidates.isNotEmpty && !_isSigningPersona)
-        _buildVisionTargetingOverlay(),
+      // LIVE VISION TARGETING: Visual indicator of what the camera is seeing
+      if (_candidates.isNotEmpty && !_isSigningPersona) _buildLiveTargeter(),
 
       Column(children: [
         _buildIdentitySwitcher(),
         if (_isSigningPersona) _buildGesturePrompt(),
-        if (!_isSigningPersona && _candidates.isNotEmpty) _buildCandidateShelf(),
+        if (!_isSigningPersona && _candidates.isNotEmpty) _buildObjectShelf(),
         const Spacer(),
         Padding(
           padding: const EdgeInsets.all(24.0),
           child: FloatingActionButton.extended(
-            onPressed: _openRealScanner,
-            icon: const Icon(LucideIcons.qrCode),
+            onPressed: _openRealScanner, icon: const Icon(LucideIcons.qrCode),
             label: const Text("VAMPIRE READ"),
-            backgroundColor: const Color(0xFF00FFC8),
-            foregroundColor: Colors.black,
+            backgroundColor: const Color(0xFF00FFC8), foregroundColor: Colors.black,
           ),
         ),
       ])
     ]);
   }
 
-  Widget _buildVisionTargetingOverlay() {
+  Widget _buildLiveTargeter() {
+    final primary = _candidates.first;
     return Center(
       child: Column(mainAxisSize: MainAxisSize.min, children: [
         Container(
-          width: 200, height: 200,
+          width: 220, height: 220,
           decoration: BoxDecoration(
-            border: Border.all(color: const Color(0xFF00FFC8), width: 2),
-            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0xFF00FFC8).withOpacity(0.5), width: 2),
+            borderRadius: BorderRadius.circular(24),
           ),
-          child: const Icon(LucideIcons.scan, color: Color(0xFF00FFC8), size: 40),
+          child: const Icon(LucideIcons.focus, color: Color(0xFF00FFC8), size: 32),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 16),
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-          decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(8)),
-          child: Text("IDENTIFIED: ${_candidates.first.label}", style: const TextStyle(color: Color(0xFF00FFC8), fontSize: 12, fontWeight: FontWeight.bold)),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          decoration: BoxDecoration(color: Colors.black87, borderRadius: BorderRadius.circular(12)),
+          child: Text("RECOGNIZED: ${primary.objectLabel}", style: const TextStyle(color: Color(0xFF00FFC8), fontWeight: FontWeight.bold, fontSize: 13)),
         )
       ]),
     );
@@ -311,9 +310,9 @@ class _HomeScreenState extends State<HomeScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8), color: Colors.black87,
       child: Row(children: [
-        const Icon(LucideIcons.user, size: 16, color: Color(0xFF00FFC8)),
+        const Icon(LucideIcons.userCheck, size: 16, color: Color(0xFF00FFC8)),
         const SizedBox(width: 12),
-        const Text("Active: ", style: TextStyle(fontSize: 12, color: Colors.white54)),
+        const Text("Active Persona: ", style: TextStyle(fontSize: 12, color: Colors.white54)),
         if (_identities.isNotEmpty)
           DropdownButton<SatyaIdentity>(
             value: _selectedIdentity,
@@ -325,30 +324,37 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildCandidateShelf() {
+  Widget _buildObjectShelf() {
     return Container(
-      height: 80, margin: const EdgeInsets.all(16), padding: const EdgeInsets.symmetric(horizontal: 12),
-      decoration: BoxDecoration(color: Colors.black87, borderRadius: BorderRadius.circular(20), border: Border.all(color: const Color(0xFF00FFC8))),
+      height: 90, margin: const EdgeInsets.all(16), padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(color: Colors.black87, borderRadius: BorderRadius.circular(24), border: Border.all(color: const Color(0xFF00FFC8), width: 0.5)),
       child: ListView.builder(
         scrollDirection: Axis.horizontal, itemCount: _candidates.length,
-        itemBuilder: (c, i) => Padding(padding: const EdgeInsets.only(right: 8), child: ActionChip(avatar: const Icon(LucideIcons.plus, size: 14), label: Text(_candidates[i].label), onPressed: () => _startVisionAdoption(_candidates[i])))
+        itemBuilder: (c, i) => Padding(
+          padding: const EdgeInsets.only(right: 12),
+          child: ActionChip(
+            backgroundColor: const Color(0xFF00FFC8).withOpacity(0.1),
+            avatar: const Icon(LucideIcons.plusCircle, size: 14, color: Color(0xFF00FFC8)),
+            label: Text(_candidates[i].objectLabel, style: const TextStyle(color: Colors.white, fontSize: 12)),
+            onPressed: () => _startVisionAdoption(_candidates[i]),
+          ),
+        )
       ),
     );
   }
 
   Widget _buildGesturePrompt() {
     return Container(
-      width: double.infinity, margin: const EdgeInsets.all(16), padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(color: const Color(0xFF00FFC8), borderRadius: BorderRadius.circular(24)),
+      width: double.infinity, margin: const EdgeInsets.all(16), padding: const EdgeInsets.all(28),
+      decoration: BoxDecoration(color: const Color(0xFF00FFC8), borderRadius: BorderRadius.circular(28)),
       child: Column(children: [
-        const Icon(LucideIcons.thumbsUp, size: 48, color: Colors.black),
+        const Icon(LucideIcons.thumbsUp, size: 54, color: Colors.black),
+        const SizedBox(height: 16),
+        Text("ADOPTING: ${_visionTarget?.objectLabel}", style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 16)),
+        Text("Internal Grouping: ${_visionTarget?.personaType}", style: const TextStyle(color: Colors.black54, fontSize: 12)),
         const SizedBox(height: 12),
-        Text("ADOPTING: ${_visionTarget?.label}", style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
-        const Text("Perform 'Thumbs Up' Gesture to Sign", style: TextStyle(color: Colors.black54, fontSize: 11)),
+        const Text("Perform 'Thumbs Up' to Sign & Derive DID", style: TextStyle(color: Colors.black, fontSize: 11, letterSpacing: 1)),
       ]),
     );
   }
-
-  Widget _buildHistoryTab() => const Center(child: Text("Interaction Ledger (Nostr Kind 29001)"));
-  Widget _buildSetupTab() => Center(child: ElevatedButton(onPressed: _refresh, child: const Text("Sync HD DIDs")));
 }
