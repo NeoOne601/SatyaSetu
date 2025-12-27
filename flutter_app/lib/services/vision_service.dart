@@ -1,8 +1,8 @@
 /**
  * FILE: flutter_app/lib/services/vision_service.dart
- * VERSION: 1.7.10
- * PHASE: Phase 7.2 (Selection Logic)
- * FIX: Ensured dart:io import prevents runtime crash on initialization.
+ * VERSION: 1.8.0
+ * PHASE: Phase 7.2 (The Hybrid Lens)
+ * PURPOSE: Maintains object discovery for adoption while ensuring stable platform switching.
  */
 
 import 'dart:async';
@@ -47,6 +47,7 @@ class VisionService {
     }
   }
 
+  /// PROBE: Simulates object detection on iMac for Phase 7.2 testing.
   void _runIMacDiscoveryProbe() {
     Timer.periodic(const Duration(seconds: 4), (timer) {
       final candidates = timer.tick % 2 == 0 
