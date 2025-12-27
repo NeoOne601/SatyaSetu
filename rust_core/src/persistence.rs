@@ -1,12 +1,8 @@
 /**
- * PROJECT SATYA: RUST CORE ENGINE
- * ===============================
- * PHASE: 6.7 (Resilient Trinity Baseline)
- * VERSION: 1.6.7
- * STATUS: STABLE (macOS Forensic Fix)
- * DESCRIPTION:
- * Manages vault file operations. Handles 'lazy' filesystem states 
- * common in sandboxed macOS environments.
+ * FILE: rust_core/src/persistence.rs
+ * VERSION: 1.7.9
+ * PHASE: Phase 7
+ * DESCRIPTION: Manages the encrypted on-disk storage of identities and keys.
  */
 
 use serde::{Deserialize, Serialize};
@@ -15,11 +11,13 @@ use crate::domain::SatyaIdentity;
 use crate::crypto::{VaultKey, encrypt_with_binding, decrypt_with_binding};
 use anyhow::{Result, anyhow, Context};
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 #[derive(Serialize, Deserialize, Default)]
 pub struct SatyaVault {
     pub version: u32,
+    /// Master entropy for HD derivation
+    pub master_seed: Vec<u8>,
     pub identities: Vec<SatyaIdentity>,
     pub private_keys: HashMap<String, Vec<u8>>,
 }
@@ -32,8 +30,9 @@ impl VaultManager {
     pub fn new(base_path: &str) -> Self {
         let mut path = PathBuf::from(base_path);
         path.push("satya_vault/vault.bin");
-        // Ensure the container exists
-        let _ = fs::create_dir_all(path.parent().unwrap());
+        if let Some(parent) = path.parent() {
+            let _ = fs::create_dir_all(parent);
+        }
         Self { storage_path: path }
     }
 
@@ -47,22 +46,11 @@ impl VaultManager {
     }
 
     pub fn load(&self, key: &VaultKey, hw_id: &[u8]) -> Result<SatyaVault> {
-        // PRINCIPAL FIX: If file is missing or effectively empty (0 bytes), return a clean vault
-        if !self.storage_path.exists() {
-            return Ok(SatyaVault::default());
-        }
-        
-        let metadata = fs::metadata(&self.storage_path)?;
-        if metadata.len() == 0 {
-            return Ok(SatyaVault::default());
-        }
-
+        if !self.storage_path.exists() { return Ok(SatyaVault::default()); }
         let encrypted = fs::read(&self.storage_path)?;
         let decrypted = decrypt_with_binding(key, hw_id, &encrypted)
             .map_err(|_| anyhow!("Hardware/PIN Mismatch"))?;
-            
-        let vault: SatyaVault = bincode::deserialize(&decrypted)
-            .context("Vault corruption detected")?;
+        let vault: SatyaVault = bincode::deserialize(&decrypted).context("Vault corruption")?;
         Ok(vault)
     }
 }

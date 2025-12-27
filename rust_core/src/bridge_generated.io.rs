@@ -2,16 +2,6 @@ use super::*;
 // Section: wire functions
 
 #[no_mangle]
-pub extern "C" fn wire_rust_init_core(port_: i64) {
-    wire_rust_init_core_impl(port_)
-}
-
-#[no_mangle]
-pub extern "C" fn wire_rust_reset_vault(port_: i64, storage_path: *mut wire_uint_8_list) {
-    wire_rust_reset_vault_impl(port_, storage_path)
-}
-
-#[no_mangle]
 pub extern "C" fn wire_rust_initialize_vault(
     port_: i64,
     pin: *mut wire_uint_8_list,
@@ -24,6 +14,16 @@ pub extern "C" fn wire_rust_initialize_vault(
 #[no_mangle]
 pub extern "C" fn wire_rust_create_identity(port_: i64, label: *mut wire_uint_8_list) {
     wire_rust_create_identity_impl(port_, label)
+}
+
+#[no_mangle]
+pub extern "C" fn wire_rust_get_identities(port_: i64) {
+    wire_rust_get_identities_impl(port_)
+}
+
+#[no_mangle]
+pub extern "C" fn wire_rust_scan_qr(port_: i64, raw_qr_string: *mut wire_uint_8_list) {
+    wire_rust_scan_qr_impl(port_, raw_qr_string)
 }
 
 #[no_mangle]
@@ -41,13 +41,8 @@ pub extern "C" fn wire_rust_publish_to_nostr(port_: i64, signed_json: *mut wire_
 }
 
 #[no_mangle]
-pub extern "C" fn wire_rust_get_identities(port_: i64) {
-    wire_rust_get_identities_impl(port_)
-}
-
-#[no_mangle]
-pub extern "C" fn wire_rust_scan_qr(port_: i64, raw_qr_string: *mut wire_uint_8_list) {
-    wire_rust_scan_qr_impl(port_, raw_qr_string)
+pub extern "C" fn wire_rust_reset_vault(port_: i64, storage_path: *mut wire_uint_8_list) {
+    wire_rust_reset_vault_impl(port_, storage_path)
 }
 
 // Section: allocate functions
