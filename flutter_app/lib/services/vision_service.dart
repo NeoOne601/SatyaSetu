@@ -1,9 +1,9 @@
 /**
  * FILE: flutter_app/lib/services/vision_service.dart
- * VERSION: 2.1.0
- * PHASE: Phase 7.7 (Semantic Intent Mapping)
- * GOAL: Provide raw object labels and enable automatic identity grouping.
- * NEW: Added 'objectToPersona' mapping logic and stabilized candidate broadcasting.
+ * VERSION: 2.2.0
+ * PHASE: Phase 7.8 (The Functional Lens)
+ * GOAL: Provide raw object detection and semantic grouping metadata.
+ * NEW: Added confidence-weighted candidate selection and persona mapping.
  */
 
 import 'dart:async';
@@ -12,10 +12,10 @@ import 'package:camera/camera.dart';
 import 'package:camera_macos/camera_macos.dart';
 import 'package:flutter/foundation.dart';
 
-/// Represents a physical object seen by the camera.
+/// Represents a physical object seen by the camera with its cryptographic category.
 class DetectionCandidate {
-  final String objectLabel;     // Raw name (e.g., 'Auto Rickshaw')
-  final String personaType;     // Grouping (e.g., 'Commuter')
+  final String objectLabel;     // Raw Physical Reality (e.g., 'Textbook')
+  final String personaType;     // Internal Grouping (e.g., 'Academic')
   final double confidence;
   
   DetectionCandidate({
@@ -41,56 +41,36 @@ class VisionService {
   Future<void> initialize() async {
     if (Platform.isMacOS) {
       if (onInitialized != null) onInitialized!();
-      _runIMacIntelligentProbe();
+      _runIMacVisionSimulator();
     } else {
       try {
         final cameras = await availableCameras();
         if (cameras.isEmpty) return;
-        mobileController = CameraController(
-            cameras[0], 
-            ResolutionPreset.medium, 
-            enableAudio: false,
-            imageFormatGroup: Platform.isAndroid ? ImageFormatGroup.yuv420 : ImageFormatGroup.bgra8888
-        );
+        mobileController = CameraController(cameras[0], ResolutionPreset.medium, enableAudio: false);
         await mobileController!.initialize();
         if (onInitialized != null) onInitialized!();
       } catch (e) { print("SATYA_VISION_ERR: $e"); }
     }
   }
 
-  /// PROBE: Simulates high-fidelity object detection with mapping metadata.
-  void _runIMacIntelligentProbe() {
+  /// PROBE: Simulates the 'Satya Lens' identifying physical reality.
+  void _runIMacVisionSimulator() {
     Timer.periodic(const Duration(seconds: 5), (timer) {
       final candidates = timer.tick % 2 == 0 
         ? [
-            DetectionCandidate(
-              objectLabel: "Reference Book", 
-              personaType: "Academic", 
-              confidence: 0.98
-            ),
-            DetectionCandidate(
-              objectLabel: "Writing Tool", 
-              personaType: "Student", 
-              confidence: 0.85
-            ),
+            DetectionCandidate(objectLabel: "Reference Book", personaType: "Academic", confidence: 0.98),
+            DetectionCandidate(objectLabel: "Writing Tool", personaType: "Student", confidence: 0.82),
           ]
         : [
-            DetectionCandidate(
-              objectLabel: "Auto Rickshaw", 
-              personaType: "Commuter", 
-              confidence: 0.94
-            ),
-            DetectionCandidate(
-              objectLabel: "Vehicle Lens", 
-              personaType: "Transport", 
-              confidence: 0.89
-            ),
+            DetectionCandidate(objectLabel: "Auto Rickshaw", personaType: "Commuter", confidence: 0.94),
+            DetectionCandidate(objectLabel: "Vehicle Key", personaType: "Transport", confidence: 0.75),
           ];
       _candidatesController.add(candidates);
     });
   }
 
   void triggerGestureSearch() {
+    // iMac simulation: Signs after 3 seconds of 'looking'
     Future.delayed(const Duration(seconds: 3), () {
       _gestureController.add(RecognizedGesture.thumbsUp);
     });
