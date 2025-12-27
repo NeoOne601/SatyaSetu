@@ -1,8 +1,8 @@
 /**
  * FILE: flutter_app/lib/services/vision_service.dart
- * VERSION: 1.9.0
+ * VERSION: 2.0.0
  * PHASE: Phase 7.2 (The Lens of Reality)
- * PURPOSE: Maintains object discovery probes while ensuring stable platform switching.
+ * PURPOSE: Maintains object discovery probes with improved candidate stabilization.
  */
 
 import 'dart:async';
@@ -47,11 +47,12 @@ class VisionService {
     }
   }
 
-  /// PROBE: Simulates detection of physical candidates on the iMac for testing Phase 7.2.
+  /// PROBE: Simulates detection of physical candidates. 
+  /// Increased interval to 6s for UI stability during adoption.
   void _runIMacDiscoveryProbe() {
-    Timer.periodic(const Duration(seconds: 5), (timer) {
+    Timer.periodic(const Duration(seconds: 6), (timer) {
       final candidates = timer.tick % 2 == 0 
-        ? [DetectionCandidate(label: "Reference Book", intent: RecognizedIntent.education, confidence: 0.98)]
+        ? [DetectionCandidate(label: "Academic Tool", intent: RecognizedIntent.education, confidence: 0.98)]
         : [DetectionCandidate(label: "Rickshaw/Auto", intent: RecognizedIntent.rideHailing, confidence: 0.92)];
       _candidatesController.add(candidates);
     });
