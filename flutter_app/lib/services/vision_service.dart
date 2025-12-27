@@ -1,8 +1,8 @@
 /**
  * FILE: flutter_app/lib/services/vision_service.dart
- * VERSION: 1.8.0
- * PHASE: Phase 7.2 (The Hybrid Lens)
- * PURPOSE: Maintains object discovery for adoption while ensuring stable platform switching.
+ * VERSION: 1.9.0
+ * PHASE: Phase 7.2 (The Lens of Reality)
+ * PURPOSE: Maintains object discovery probes while ensuring stable platform switching.
  */
 
 import 'dart:async';
@@ -47,12 +47,12 @@ class VisionService {
     }
   }
 
-  /// PROBE: Simulates object detection on iMac for Phase 7.2 testing.
+  /// PROBE: Simulates detection of physical candidates on the iMac for testing Phase 7.2.
   void _runIMacDiscoveryProbe() {
-    Timer.periodic(const Duration(seconds: 4), (timer) {
+    Timer.periodic(const Duration(seconds: 5), (timer) {
       final candidates = timer.tick % 2 == 0 
         ? [DetectionCandidate(label: "Reference Book", intent: RecognizedIntent.education, confidence: 0.98)]
-        : [DetectionCandidate(label: "Auto Rickshaw", intent: RecognizedIntent.rideHailing, confidence: 0.92)];
+        : [DetectionCandidate(label: "Rickshaw/Auto", intent: RecognizedIntent.rideHailing, confidence: 0.92)];
       _candidatesController.add(candidates);
     });
   }
