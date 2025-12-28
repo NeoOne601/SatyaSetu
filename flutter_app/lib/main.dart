@@ -1,9 +1,9 @@
 /**
  * FILE: flutter_app/lib/main.dart
- * VERSION: 2.2.0
- * PHASE: Phase 7.8 (The Functional Lens)
- * GOAL: Unified QR interaction, HistoryHub, and Live Vision Overlays.
- * FIX: Resolved Dropdown reference mismatch and restored Nostr broadcast path.
+ * VERSION: 2.6.0
+ * PHASE: Phase 8.1 (Functional Reality Hub)
+ * GOAL: Target-Locked Tracking Overlays and Stable Identity Selection.
+ * FIX: Switched Dropdown to ID-based selection to prevent reference crashes.
  */
 
 import 'dart:io';
@@ -33,16 +33,8 @@ class SatyaApp extends StatelessWidget {
   final IdentityRepository repo;
   final VisionService visionService;
   const SatyaApp({super.key, required this.vaultService, required this.repo, required this.visionService});
-  
   @override Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true, 
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF00FFC8), brightness: Brightness.dark),
-      ),
-      home: UnlockScreen(vaultService: vaultService, repo: repo, visionService: visionService),
-    );
+    return MaterialApp(debugShowCheckedModeBanner: false, theme: ThemeData(useMaterial3: true, colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF00FFC8), brightness: Brightness.dark)), home: UnlockScreen(vaultService: vaultService, repo: repo, visionService: visionService));
   }
 }
 
@@ -57,50 +49,25 @@ class UnlockScreen extends StatefulWidget {
 class _UnlockScreenState extends State<UnlockScreen> {
   final TextEditingController _pinController = TextEditingController();
   bool _isLoading = false;
-
   Future<void> _attemptUnlock() async {
     if (_pinController.text.length < 6) return;
     setState(() => _isLoading = true);
-    try {
-      final directory = await getApplicationSupportDirectory();
-      final hwId = await HardwareIdService.getDeviceId();
-      final success = await widget.vaultService.unlock(_pinController.text, hwId, directory.path);
-      if (success && mounted) {
-        await widget.visionService.initialize();
-        Navigator.of(context).pushReplacement(MaterialPageRoute(
-          builder: (_) => HomeScreen(vaultService: widget.vaultService, repo: widget.repo, visionService: widget.visionService)
-        ));
-      } else {
-        _pinController.clear();
-        setState(() => _isLoading = false);
-      }
-    } catch (_) { setState(() => _isLoading = false); }
+    final directory = await getApplicationSupportDirectory();
+    final hwId = await HardwareIdService.getDeviceId();
+    final ok = await widget.vaultService.unlock(_pinController.text, hwId, directory.path);
+    if (ok && mounted) {
+      await widget.visionService.initialize();
+      Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => HomeScreen(vaultService: widget.vaultService, repo: widget.repo, visionService: widget.visionService)));
+    } else { setState(() => _isLoading = false); _pinController.clear(); }
   }
-
   @override Widget build(BuildContext context) {
-    return Scaffold(
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(LucideIcons.shieldCheck, size: 80, color: Color(0xFF00FFC8)),
-            const SizedBox(height: 48),
-            Container(
-              constraints: const BoxConstraints(maxWidth: 300),
-              child: TextField(
-                controller: _pinController, obscureText: true, textAlign: TextAlign.center, 
-                style: const TextStyle(fontSize: 24, letterSpacing: 16),
-                decoration: const InputDecoration(hintText: "••••••"),
-                keyboardType: TextInputType.number,
-                onChanged: (v) { if (v.length == 6) _attemptUnlock(); }
-              ),
-            ),
-            const SizedBox(height: 32),
-            _isLoading ? const CircularProgressIndicator() : ElevatedButton(onPressed: _attemptUnlock, child: const Text("Unlock Identity")),
-          ],
-        ),
-      ),
-    );
+    return Scaffold(body: Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+      const Icon(LucideIcons.shieldCheck, size: 80, color: Color(0xFF00FFC8)),
+      const SizedBox(height: 48),
+      Container(constraints: const BoxConstraints(maxWidth: 300), child: TextField(controller: _pinController, obscureText: true, textAlign: TextAlign.center, decoration: const InputDecoration(hintText: "••••••"), keyboardType: TextInputType.number, onChanged: (v) { if (v.length == 6) _attemptUnlock(); })),
+      const SizedBox(height: 32),
+      _isLoading ? const CircularProgressIndicator() : ElevatedButton(onPressed: _attemptUnlock, child: const Text("Unlock Identity Vault"))
+    ])));
   }
 }
 
@@ -116,123 +83,67 @@ class _HomeScreenState extends State<HomeScreen> {
   int _currentTab = 0;
   List<SatyaIdentity> _identities = [];
   List<DetectionCandidate> _candidates = [];
-  SatyaIdentity? _selectedIdentity;
+  List<dynamic> _history = [];
+  String? _selectedIdentityId; // FIXED: Using ID for dropdown stability
   DetectionCandidate? _visionTarget;
   bool _isSigningPersona = false;
   bool _isSyncing = true;
-  String _lastStatus = "Ready";
 
   @override void initState() {
     super.initState();
     _refresh();
-    widget.visionService.candidatesStream.listen((c) {
-      if (mounted && !_isSigningPersona && _currentTab == 0) setState(() => _candidates = c);
-    });
-    widget.visionService.gestureStream.listen((g) {
-      if (g == RecognizedGesture.thumbsUp && _visionTarget != null) _finalizeNewPersona();
-    });
+    widget.visionService.candidatesStream.listen((c) { if (mounted && !_isSigningPersona && _currentTab == 0) setState(() => _candidates = c); });
+    widget.visionService.gestureStream.listen((g) { if (g == RecognizedGesture.thumbsUp && _visionTarget != null) _finalizeAdoption(); });
   }
 
   Future<void> _refresh() async {
     setState(() => _isSyncing = true);
     final list = await widget.repo.getIdentities();
+    final hStrings = await widget.repo.fetchInteractionHistory();
     setState(() { 
       _identities = list; 
-      // FIXED: Use ID comparison for Dropdown safety to prevent crash on refresh
+      _history = hStrings.map((s) => jsonDecode(s)).toList();
       if (_identities.isNotEmpty) {
-        if (_selectedIdentity == null) {
-          _selectedIdentity = _identities.first;
-        } else {
-          try {
-            _selectedIdentity = _identities.firstWhere((i) => i.id == _selectedIdentity!.id);
-          } catch (_) {
-            _selectedIdentity = _identities.first;
-          }
+        if (_selectedIdentityId == null || !_identities.any((i) => i.id == _selectedIdentityId)) {
+          _selectedIdentityId = _identities.first.id;
         }
       }
       _isSyncing = false; 
     });
   }
 
-  /// VAMPIRE READ: Opens the scanner and processes QR data.
   void _openRealScanner() {
-    Navigator.of(context).push(MaterialPageRoute(
-      builder: (context) => Scaffold(
-        appBar: AppBar(title: const Text("VAMPIRE READ")),
-        body: Stack(children: [
-          MobileScanner(
-            onDetect: (capture) {
-              final List<Barcode> barcodes = capture.barcodes;
-              if (barcodes.isNotEmpty) {
-                final String? code = barcodes.first.rawValue;
-                if (code != null && code.contains("upi://")) {
-                  Navigator.pop(context);
-                  _processUpi(code);
-                }
-              }
-            },
-          ),
-          // Simulation Button for iMac Testing
-          if (Platform.isMacOS)
-            Center(child: ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                _processUpi("upi://pay?pa=satya@bank&pn=Merchant&am=250&cu=INR");
-              }, 
-              child: const Text("Simulate QR Found")
-            ))
-        ]),
-      ),
-    ));
+    Navigator.of(context).push(MaterialPageRoute(builder: (context) => Scaffold(appBar: AppBar(title: const Text("VAMPIRE READ")), body: Stack(children: [
+      MobileScanner(onDetect: (capture) {
+        final code = capture.barcodes.first.rawValue;
+        if (code != null && code.contains("upi://")) { Navigator.pop(context); _processUpi(code); }
+      }),
+      if (Platform.isMacOS) Center(child: ElevatedButton(onPressed: () { Navigator.pop(context); _processUpi("upi://pay?pa=satya@bank&pn=Merchant&am=100&cu=INR"); }, child: const Text("Simulation: QR Detected")))
+    ]))));
   }
 
-  Future<void> _processUpi(String rawUpi) async {
-    setState(() => _lastStatus = "Decoding...");
-    try {
-      final jsonStr = await widget.repo.scanQr(rawUpi);
-      final data = jsonDecode(jsonStr);
-      if (mounted) _showInteractionModal(data, rawUpi);
-    } catch (e) {
-      setState(() => _lastStatus = "Read Error");
-    }
+  Future<void> _processUpi(String raw) async {
+    final json = await widget.repo.scanQr(raw);
+    final data = jsonDecode(json);
+    if (mounted) _showInteractionModal(data, raw);
   }
 
-  void _showInteractionModal(Map data, String rawUpi) {
-    showModalBottomSheet(
-      context: context, backgroundColor: Colors.black,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(32))),
-      builder: (c) => Container(
-        padding: const EdgeInsets.all(28),
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          const Icon(LucideIcons.zap, color: Color(0xFF00FFC8), size: 54),
-          const SizedBox(height: 16),
-          Text("${data['amount']} ${data['currency']}", style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Color(0xFF00FFC8))),
-          Text("Pay to: ${data['name']}", style: const TextStyle(color: Colors.white70)),
-          const Divider(height: 48, color: Colors.white10),
-          Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-            const Text("Signing Persona:"),
-            Text(_selectedIdentity?.label ?? "None", style: const TextStyle(color: Color(0xFF00FFC8), fontWeight: FontWeight.bold)),
-          ]),
-          const SizedBox(height: 32),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              icon: const Icon(LucideIcons.send),
-              onPressed: () async {
-                Navigator.pop(c);
-                setState(() => _lastStatus = "Signing...");
-                final signedJson = await widget.repo.signIntent(_selectedIdentity!.id, rawUpi);
-                setState(() => _lastStatus = "Broadcasting...");
-                final ok = await widget.repo.publishToNostr(signedJson);
-                setState(() => _lastStatus = ok ? "Nostr Active" : "Relay Failure");
-              }, 
-              label: const Text("SIGN & PUBLISH"),
-              style: ElevatedButton.styleFrom(padding: const EdgeInsets.all(16)),
-            ),
-          )
-        ]),
-      )
-    );
+  void _showInteractionModal(Map data, String raw) {
+    showModalBottomSheet(context: context, backgroundColor: Colors.black, shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(32))), builder: (c) => Container(padding: const EdgeInsets.all(32), child: Column(mainAxisSize: MainAxisSize.min, children: [
+      const Icon(LucideIcons.zap, color: Color(0xFF00FFC8), size: 54),
+      const SizedBox(height: 12),
+      Text("${data['amount']} ${data['currency']}", style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Color(0xFF00FFC8))),
+      Text("Pay to: ${data['name']}"),
+      const Divider(height: 48, color: Colors.white10),
+      const SizedBox(height: 32),
+      SizedBox(width: double.infinity, child: ElevatedButton.icon(icon: const Icon(LucideIcons.send), onPressed: () async {
+        Navigator.pop(c);
+        if (_selectedIdentityId == null) return;
+        final signed = await widget.repo.signIntent(_selectedIdentityId!, raw);
+        await widget.repo.publishToNostr(signed);
+        _refresh();
+      }, label: const Text("SIGN & BROADCAST")))
+    ])));
   }
 
   void _startVisionAdoption(DetectionCandidate candidate) {
@@ -240,177 +151,118 @@ class _HomeScreenState extends State<HomeScreen> {
     widget.visionService.triggerGestureSearch();
   }
 
-  Future<void> _finalizeNewPersona() async {
-    // SEMANTIC MAPPING: Groups the object under the Persona category
-    final derivedLabel = "${_visionTarget!.personaType} (${_visionTarget!.objectLabel})";
-    await widget.vaultService.createNewIdentity(derivedLabel);
+  Future<void> _finalizeAdoption() async {
+    // SEMANTIC ADOPTION: Automatically groups the object label into a Persona category.
+    final label = "${_visionTarget!.personaType} (${_visionTarget!.objectLabel})";
+    await widget.vaultService.createNewIdentity(label);
     setState(() { _isSigningPersona = false; _visionTarget = null; });
     await _refresh();
-    HapticFeedback.heavyImpact();
   }
 
   @override Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(_currentTab == 0 ? "SATYA LENS" : _currentTab == 1 ? "HISTORY" : "SETUP"),
-        actions: [
-          Center(child: Padding(padding: const EdgeInsets.only(right: 16.0), child: Text(_lastStatus, style: const TextStyle(fontSize: 10, color: Color(0xFF00FFC8))))),
-        ],
-      ),
+      appBar: AppBar(title: Text(_currentTab == 0 ? "SATYA LENS" : _currentTab == 1 ? "LEDGER" : "SETUP"), actions: [
+        IconButton(icon: const Icon(LucideIcons.refreshCw, size: 18), onPressed: _refresh)
+      ]),
       body: _buildBody(),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentTab,
-        onTap: (i) => setState(() => _currentTab = i),
-        selectedItemColor: const Color(0xFF00FFC8),
-        items: const [
-          BottomNavigationBarItem(icon: Icon(LucideIcons.aperture), label: "Scanner"),
-          BottomNavigationBarItem(icon: Icon(LucideIcons.history), label: "History"),
-          BottomNavigationBarItem(icon: Icon(LucideIcons.settings), label: "Setup"),
-        ],
-      ),
+      bottomNavigationBar: BottomNavigationBar(currentIndex: _currentTab, onTap: (i) => setState(() => _currentTab = i), selectedItemColor: const Color(0xFF00FFC8), items: const [
+        BottomNavigationBarItem(icon: Icon(LucideIcons.aperture), label: "Scanner"),
+        BottomNavigationBarItem(icon: Icon(LucideIcons.history), label: "History"),
+        BottomNavigationBarItem(icon: Icon(LucideIcons.settings), label: "Setup"),
+      ]),
     );
   }
 
   Widget _buildBody() {
-    switch (_currentTab) {
-      case 1: return _buildHistoryTab();
-      case 2: return _buildSetupTab();
-      default: return _buildScannerTab();
-    }
+    if (_currentTab == 1) return _buildHistoryTab();
+    if (_currentTab == 2) return _buildSetupTab();
+    return _buildScannerTab();
   }
 
   Widget _buildScannerTab() {
-    return Stack(children: [
-      Positioned.fill(child: Opacity(opacity: 0.4, child: Platform.isMacOS 
-        ? CameraMacOSView(cameraMode: CameraMacOSMode.photo, onCameraInizialized: (c) => widget.visionService.macController = c)
-        : const Center(child: Text("Camera Feed Unavailable")))),
-      
-      // LIVE VISION OVERLAY: Show raw labels directly on feed
-      if (_candidates.isNotEmpty && !_isSigningPersona) _buildLiveReticle(),
+    return LayoutBuilder(builder: (context, constraints) {
+      return Stack(children: [
+        Positioned.fill(child: Opacity(opacity: 0.4, child: Platform.isMacOS 
+          ? CameraMacOSView(cameraMode: CameraMacOSMode.photo, onCameraInizialized: (c) => widget.visionService.macController = c)
+          : const Center(child: Text("Camera Feed Unloaded")))),
+        
+        // DYNAMIC TARGET-LOCKED RETICLES
+        if (!_isSigningPersona)
+          ..._candidates.map((c) => _buildLockedReticle(c, constraints.maxWidth, constraints.maxHeight)),
 
-      Column(children: [
-        _buildIdentitySwitcher(),
-        if (_isSigningPersona) _buildGesturePrompt(),
-        if (!_isSigningPersona && _candidates.isNotEmpty) _buildObjectShelf(),
-        const Spacer(),
-        Padding(
-          padding: const EdgeInsets.all(32.0),
-          child: FloatingActionButton.extended(
-            onPressed: _openRealScanner, icon: const Icon(LucideIcons.qrCode),
-            label: const Text("VAMPIRE READ"),
-            backgroundColor: const Color(0xFF00FFC8), foregroundColor: Colors.black,
+        Column(children: [
+          _buildIdentitySwitcher(),
+          if (_isSigningPersona) _buildGesturePrompt(),
+          if (!_isSigningPersona && _candidates.isNotEmpty) _buildObjectShelf(),
+          const Spacer(),
+          Padding(padding: const EdgeInsets.all(32.0), child: FloatingActionButton.extended(onPressed: _openRealScanner, icon: const Icon(LucideIcons.qrCode), label: const Text("VAMPIRE READ"), backgroundColor: const Color(0xFF00FFC8), foregroundColor: Colors.black)),
+        ])
+      ]);
+    });
+  }
+
+  Widget _buildLockedReticle(DetectionCandidate c, double screenW, double screenH) {
+    return Positioned(
+      left: c.relativeLocation.left * screenW,
+      top: c.relativeLocation.top * screenH,
+      width: c.relativeLocation.width * screenW,
+      height: c.relativeLocation.height * screenH,
+      child: Container(
+        decoration: BoxDecoration(border: Border.all(color: const Color(0xFF00FFC8).withOpacity(0.6), width: 1.5), borderRadius: BorderRadius.circular(16)),
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: Container(
+            margin: const EdgeInsets.only(top: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            decoration: BoxDecoration(color: Colors.black87, borderRadius: BorderRadius.circular(4)),
+            child: Text(c.objectLabel.toUpperCase(), style: const TextStyle(fontSize: 10, color: Color(0xFF00FFC8), fontWeight: FontWeight.bold, letterSpacing: 1)),
           ),
         ),
-      ])
-    ]);
-  }
-
-  Widget _buildLiveReticle() {
-    final primary = _candidates.first;
-    return Center(
-      child: Column(mainAxisSize: MainAxisSize.min, children: [
-        Container(
-          width: 220, height: 220,
-          decoration: BoxDecoration(
-            border: Border.all(color: const Color(0xFF00FFC8).withOpacity(0.4), width: 1),
-            borderRadius: BorderRadius.circular(32),
-          ),
-          child: const Icon(LucideIcons.focus, color: Color(0xFF00FFC8), size: 24),
-        ),
-        const SizedBox(height: 12),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-          decoration: BoxDecoration(color: Colors.black87, borderRadius: BorderRadius.circular(12)),
-          child: Text("OBJECT: ${primary.objectLabel}", style: const TextStyle(color: Color(0xFF00FFC8), fontWeight: FontWeight.bold, fontSize: 13)),
-        )
-      ]),
-    );
-  }
-
-  Widget _buildIdentitySwitcher() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8), color: Colors.black87,
-      child: Row(children: [
-        const Icon(LucideIcons.userCheck, size: 16, color: Color(0xFF00FFC8)),
-        const SizedBox(width: 12),
-        const Text("Signer: ", style: TextStyle(fontSize: 11, color: Colors.white54)),
-        if (_identities.isNotEmpty)
-          DropdownButton<SatyaIdentity>(
-            value: _selectedIdentity,
-            underline: const SizedBox(),
-            items: _identities.map((id) => DropdownMenuItem(value: id, child: Text(id.label))).toList(),
-            onChanged: (v) => setState(() => _selectedIdentity = v),
-          )
-      ]),
-    );
-  }
-
-  Widget _buildObjectShelf() {
-    return Container(
-      height: 90, margin: const EdgeInsets.all(16), padding: const EdgeInsets.symmetric(horizontal: 12),
-      decoration: BoxDecoration(color: Colors.black87, borderRadius: BorderRadius.circular(24), border: Border.all(color: Colors.white10)),
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal, itemCount: _candidates.length,
-        itemBuilder: (c, i) => Padding(
-          padding: const EdgeInsets.only(right: 12),
-          child: ActionChip(
-            backgroundColor: const Color(0xFF00FFC8).withOpacity(0.05),
-            avatar: const Icon(LucideIcons.plusCircle, size: 14, color: Color(0xFF00FFC8)),
-            label: Text(_candidates[i].objectLabel, style: const TextStyle(color: Colors.white, fontSize: 12)),
-            onPressed: () => _startVisionAdoption(_candidates[i]),
-          ),
-        )
       ),
     );
   }
 
-  Widget _buildGesturePrompt() {
-    return Container(
-      width: double.infinity, margin: const EdgeInsets.all(16), padding: const EdgeInsets.all(32),
-      decoration: BoxDecoration(color: const Color(0xFF00FFC8), borderRadius: BorderRadius.circular(32)),
-      child: Column(children: [
-        const Icon(LucideIcons.thumbsUp, size: 60, color: Colors.black),
-        const SizedBox(height: 16),
-        Text("ADOPTING: ${_visionTarget?.objectLabel}", style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 18)),
-        Text("Group: ${_visionTarget?.personaType}", style: const TextStyle(color: Colors.black54, fontSize: 12)),
-        const SizedBox(height: 16),
-        const Text("Perform 'Thumbs Up' Gesture to Sign", style: TextStyle(color: Colors.black, fontSize: 11, letterSpacing: 1)),
-      ]),
-    );
-  }
+  Widget _buildIdentitySwitcher() => Container(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8), color: Colors.black87, child: Row(children: [
+    const Icon(LucideIcons.userCheck, size: 16, color: Color(0xFF00FFC8)),
+    const SizedBox(width: 12),
+    const Text("Active Signer: ", style: TextStyle(fontSize: 12, color: Colors.white54)),
+    if (_identities.isNotEmpty) DropdownButton<String>(
+      value: _selectedIdentityId, 
+      underline: const SizedBox(), 
+      items: _identities.map((id) => DropdownMenuItem(value: id.id, child: Text(id.label))).toList(), 
+      onChanged: (v) => setState(() => _selectedIdentityId = v)
+    )
+  ]));
+
+  Widget _buildObjectShelf() => Container(height: 90, margin: const EdgeInsets.all(16), padding: const EdgeInsets.symmetric(horizontal: 12), decoration: BoxDecoration(color: Colors.black87, borderRadius: BorderRadius.circular(24), border: Border.all(color: Colors.white10)), child: ListView.builder(scrollDirection: Axis.horizontal, itemCount: _candidates.length, itemBuilder: (c, i) => Padding(padding: const EdgeInsets.only(right: 12), child: ActionChip(backgroundColor: Colors.white10, avatar: const Icon(LucideIcons.plusCircle, size: 14), label: Text(_candidates[i].objectLabel), onPressed: () => _startVisionAdoption(_candidates[i])))));
+
+  Widget _buildGesturePrompt() => Container(width: double.infinity, margin: const EdgeInsets.all(16), padding: const EdgeInsets.all(32), decoration: BoxDecoration(color: const Color(0xFF00FFC8), borderRadius: BorderRadius.circular(32)), child: Column(children: [
+    const Icon(LucideIcons.thumbsUp, size: 60, color: Colors.black),
+    const SizedBox(height: 16),
+    Text("ADOPTING: ${_visionTarget?.objectLabel}", style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 18)),
+    const Text("Perform 'Thumbs Up' to Sign", style: TextStyle(color: Colors.black, fontSize: 11)),
+  ]));
 
   Widget _buildHistoryTab() {
-    return Column(children: [
-      const Padding(
-        padding: EdgeInsets.all(24.0),
-        child: Text("Interaction Ledger", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-      ),
-      Expanded(child: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          _historyItem("UPI Merchant Intent", "Nostr Kind 29001", "Success"),
-          _historyItem("Peer Discovery Proof", "Nostr Kind 29001", "Success"),
-        ],
-      ))
-    ]);
+    return _isSyncing ? const Center(child: CircularProgressIndicator()) : ListView.builder(padding: const EdgeInsets.all(16), itemCount: _history.length, itemBuilder: (c, i) {
+      final payload = _history[i]['payload'];
+      final upi = payload['upi_data'];
+      return Card(color: Colors.white10, child: ListTile(
+        leading: const Icon(LucideIcons.fileSignature, color: Color(0xFF00FFC8)),
+        title: Text("Payment to ${upi['name']}"),
+        subtitle: Text("ID: ${_history[i]['signer_did']}", style: const TextStyle(fontSize: 8)),
+        trailing: Text("${upi['amount']} ${upi['currency']}", style: const TextStyle(color: Color(0xFF00FFC8))),
+      ));
+    });
   }
 
-  Widget _historyItem(String title, String type, String status) {
-    return Card(color: Colors.white10, child: ListTile(
-      leading: const Icon(LucideIcons.fileSignature, color: Color(0xFF00FFC8)),
-      title: Text(title), subtitle: Text(type), trailing: Text(status, style: const TextStyle(fontSize: 10, color: Colors.green)),
-    ));
-  }
-
-  Widget _buildSetupTab() {
-    return ListView(padding: const EdgeInsets.all(24), children: [
-      const Text("VAULT STATUS", style: TextStyle(color: Color(0xFF00FFC8), letterSpacing: 2, fontSize: 12)),
-      const ListTile(title: Text("HD Seed State"), subtitle: Text("Deterministic root derived and encrypted.")),
-      const Divider(color: Colors.white10),
-      const Text("NETWORK HUB", style: TextStyle(color: Color(0xFF00FFC8), letterSpacing: 2, fontSize: 12)),
-      const ListTile(title: Text("Relay: Damus"), subtitle: Text("wss://relay.damus.io - ONLINE")),
-      const SizedBox(height: 32),
-      ElevatedButton(onPressed: _refresh, child: const Text("Sync Persona Ledger")),
-    ]);
-  }
+  Widget _buildSetupTab() => ListView(padding: const EdgeInsets.all(24), children: [
+    const Text("VAULT SECURITY", style: TextStyle(color: Color(0xFF00FFC8), letterSpacing: 2, fontSize: 11)),
+    const ListTile(title: Text("HD Root Seed"), subtitle: Text("Bound to local silicon.")),
+    const Divider(color: Colors.white10),
+    const Text("NETWORK PROXIMITY", style: TextStyle(color: Color(0xFF00FFC8), letterSpacing: 2, fontSize: 11)),
+    const ListTile(title: Text("Relay: Damus"), subtitle: Text("Connected • Public Protocol 29001 Active")),
+    const SizedBox(height: 48),
+    ElevatedButton(onPressed: _refresh, child: const Text("Sync Ledger State"))
+  ]);
 }

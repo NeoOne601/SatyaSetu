@@ -41,6 +41,11 @@ abstract class RustCore {
 
   FlutterRustBridgeTaskConstMeta get kRustPublishToNostrConstMeta;
 
+  /// NEW: Interaction ledger retrieval from Nostr.
+  Future<List<String>> rustFetchInteractionHistory({dynamic hint});
+
+  FlutterRustBridgeTaskConstMeta get kRustFetchInteractionHistoryConstMeta;
+
   Future<bool> rustResetVault({required String storagePath, dynamic hint});
 
   FlutterRustBridgeTaskConstMeta get kRustResetVaultConstMeta;
@@ -187,6 +192,24 @@ class RustCoreImpl implements RustCore {
         argNames: ["signedJson"],
       );
 
+  Future<List<String>> rustFetchInteractionHistory({dynamic hint}) {
+    return _platform.executeNormal(FlutterRustBridgeTask(
+      callFfi: (port_) =>
+          _platform.inner.wire_rust_fetch_interaction_history(port_),
+      parseSuccessData: _wire2api_StringList,
+      parseErrorData: _wire2api_FrbAnyhowException,
+      constMeta: kRustFetchInteractionHistoryConstMeta,
+      argValues: [],
+      hint: hint,
+    ));
+  }
+
+  FlutterRustBridgeTaskConstMeta get kRustFetchInteractionHistoryConstMeta =>
+      const FlutterRustBridgeTaskConstMeta(
+        debugName: "rust_fetch_interaction_history",
+        argNames: [],
+      );
+
   Future<bool> rustResetVault({required String storagePath, dynamic hint}) {
     var arg0 = _platform.api2wire_String(storagePath);
     return _platform.executeNormal(FlutterRustBridgeTask(
@@ -216,6 +239,10 @@ class RustCoreImpl implements RustCore {
 
   String _wire2api_String(dynamic raw) {
     return raw as String;
+  }
+
+  List<String> _wire2api_StringList(dynamic raw) {
+    return (raw as List<dynamic>).cast<String>();
   }
 
   bool _wire2api_bool(dynamic raw) {
@@ -456,6 +483,17 @@ class RustCoreWire implements FlutterRustBridgeWireBase {
               ffi.Pointer<wire_uint_8_list>)>>('wire_rust_publish_to_nostr');
   late final _wire_rust_publish_to_nostr = _wire_rust_publish_to_nostrPtr
       .asFunction<void Function(int, ffi.Pointer<wire_uint_8_list>)>();
+
+  void wire_rust_fetch_interaction_history(int port_) {
+    return _wire_rust_fetch_interaction_history(port_);
+  }
+
+  late final _wire_rust_fetch_interaction_historyPtr =
+      _lookup<ffi.NativeFunction<ffi.Void Function(ffi.Int64)>>(
+    'wire_rust_fetch_interaction_history',
+  );
+  late final _wire_rust_fetch_interaction_history =
+      _wire_rust_fetch_interaction_historyPtr.asFunction<void Function(int)>();
 
   void wire_rust_reset_vault(
     int port_,

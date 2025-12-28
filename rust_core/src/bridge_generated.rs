@@ -114,6 +114,16 @@ fn wire_rust_publish_to_nostr_impl(
         },
     )
 }
+fn wire_rust_fetch_interaction_history_impl(port_: MessagePort) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap::<_, _, _, Vec<String>, _>(
+        WrapInfo {
+            debug_name: "rust_fetch_interaction_history",
+            port: Some(port_),
+            mode: FfiCallMode::Normal,
+        },
+        move || move |task_callback| rust_fetch_interaction_history(),
+    )
+}
 fn wire_rust_reset_vault_impl(
     port_: MessagePort,
     storage_path: impl Wire2Api<String> + UnwindSafe,

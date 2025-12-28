@@ -41,6 +41,11 @@ pub extern "C" fn wire_rust_publish_to_nostr(port_: i64, signed_json: *mut wire_
 }
 
 #[no_mangle]
+pub extern "C" fn wire_rust_fetch_interaction_history(port_: i64) {
+    wire_rust_fetch_interaction_history_impl(port_)
+}
+
+#[no_mangle]
 pub extern "C" fn wire_rust_reset_vault(port_: i64, storage_path: *mut wire_uint_8_list) {
     wire_rust_reset_vault_impl(port_, storage_path)
 }
