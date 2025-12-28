@@ -1,14 +1,14 @@
 # FILE: flutter_app/pubspec.yaml
-# VERSION: 1.7.8
-# PHASE: Phase 7.3 (Gesture Signatures)
+# VERSION: 1.8.4
+# PHASE: Phase 8.4 (AI Native Adaptation)
 # DESCRIPTION: 
-# Baselined dependencies for SatyaSetu.
-# Preserves Trinity stability while adding gesture/object recognition engines.
+# Adds network capabilities for dynamic AI semantic mapping via Gemini.
+# Maintains ML Kit and Camera baselines for mobile vision.
 
 name: flutter_app
 description: "SatyaSetu: Privacy-First Identity Bridge"
 publish_to: 'none'
-version: 1.7.8+1
+version: 1.8.4+1
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -17,11 +17,11 @@ dependencies:
   flutter:
     sdk: flutter
   
-  # --- RUST BRIDGE BASELINE (Commit 82e5c2f) ---
+  # --- RUST BRIDGE BASELINE ---
   flutter_rust_bridge: ^1.82.6
   ffi: ^2.0.1
   
-  # --- UI & EXPERIENCE BASELINE ---
+  # --- UI & EXPERIENCE ---
   google_fonts: ^5.0.0
   lucide_icons: ^0.257.0
   cupertino_icons: ^1.0.2
@@ -32,16 +32,18 @@ dependencies:
   mobile_scanner: ^7.1.4
   permission_handler: ^11.3.1
 
-  # --- PHASE 7: SMART VISION & GESTURES ---
+  # --- PHASE 7/8: SMART VISION & AI BRAIN ---
   camera: ^0.11.0+2
   camera_macos: ^0.0.9
   google_mlkit_object_detection: ^0.13.0
+  # NEW: Required for dynamic Gemini AI categorization
+  http: ^1.2.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^2.0.0
-  ffigen: ^8.0.0 
+  flutter_lints: ^2.0.3
+  ffigen: ^8.0.2 
 
 flutter:
   uses-material-design: true

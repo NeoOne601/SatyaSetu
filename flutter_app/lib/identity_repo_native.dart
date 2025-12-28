@@ -1,8 +1,8 @@
 /**
  * FILE: flutter_app/lib/identity_repo_native.dart
- * VERSION: 1.9.3
- * PHASE: Phase 8.1
- * PURPOSE: Implements FFI calls for interaction history and proof sync.
+ * VERSION: 1.9.4
+ * PHASE: Phase 8.2
+ * PURPOSE: Implements History Fetching and FFI stability.
  */
 
 import 'identity_domain.dart';

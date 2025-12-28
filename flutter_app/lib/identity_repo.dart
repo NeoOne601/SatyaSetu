@@ -1,8 +1,8 @@
 /**
  * FILE: flutter_app/lib/identity_repo.dart
- * VERSION: 1.9.3
- * PHASE: Phase 8.1
- * GOAL: Define stable History and Sync contracts.
+ * VERSION: 1.9.4
+ * PHASE: Phase 8.2
+ * GOAL: Maintain the Proof Fetching contract for decentralized history.
  */
 
 import 'identity_domain.dart';

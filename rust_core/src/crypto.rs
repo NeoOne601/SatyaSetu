@@ -25,7 +25,6 @@ impl VaultKey {
         let hash = argon2.hash_password(pin.as_bytes(), &salt_string)
             .map_err(|_| anyhow!("Argon2 error"))?;
         
-        // FIXED: Accessing .hash as a field
         let output = hash.hash.ok_or_else(|| anyhow!("Hash extraction failed"))?;
         
         let mut key = [0u8; 32];

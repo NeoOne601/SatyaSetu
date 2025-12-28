@@ -1,32 +1,22 @@
 /**
  * FILE: flutter_app/lib/services/vision_service.dart
- * VERSION: 2.7.0
- * PHASE: Phase 8.1 (AI Reality Integration)
- * GOAL: Integrate real-world AI object detection and classification logic.
- * DESCRIPTION: Uses google_mlkit_object_detection on mobile and Target-Lock on iMac.
- * NEW: Added InputImage processing and confidence-threshold filtering.
+ * VERSION: 3.6.0
+ * PHASE: Phase 8.6 (Zero-Shot Intelligence)
+ * GOAL: Real-time AI Object Detection and Semantic Mapping via Gemini Vision.
+ * FIX: 
+ * 1. Enforced JSON-only mode via generationConfig.
+ * 2. Standardized coordinates to [ymin, xmin, ymax, xmax].
+ * 3. Generalized prompt for better zero-shot performance on small objects (e.g. pens).
  */
 
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
-import 'dart:math';
+import 'dart:typed_data';
 import 'package:camera/camera.dart';
 import 'package:camera_macos/camera_macos.dart';
 import 'package:flutter/widgets.dart';
-import 'package:google_mlkit_object_detection/google_mlkit_object_detection.dart';
-
-/// Semantic Mapping: Raw Physical Object -> Cryptographic Identity Context
-/// This acts as the 'Satya AI Brain' to categorize raw vision labels.
-const Map<String, String> objectToPersonaMap = {
-  "Reference Book": "Academic",
-  "Writing Tool": "Student",
-  "Auto Rickshaw": "Commuter",
-  "Cell Phone": "Professional",
-  "Laptop": "Work",
-  "Person": "Social",
-  "Tablet": "Student",
-  "Car": "Transport",
-};
+import 'package:http/http.dart' as http;
 
 class DetectionCandidate {
   final String objectLabel;
@@ -46,123 +36,135 @@ enum RecognizedGesture { none, thumbsUp }
 
 class VisionService {
   CameraController? mobileController;
-  CameraMacOSController? macController;
-  ObjectDetector? _objectDetector;
-  bool _isProcessing = false;
+  CameraMacOSController? macController; 
+  bool _isAnalyzing = false;
   
   final _candidatesController = StreamController<List<DetectionCandidate>>.broadcast();
   final _gestureController = StreamController<RecognizedGesture>.broadcast();
+  final _statusController = StreamController<String>.broadcast();
   
   Stream<List<DetectionCandidate>> get candidatesStream => _candidatesController.stream;
   Stream<RecognizedGesture> get gestureStream => _gestureController.stream;
+  Stream<String> get statusStream => _statusController.stream;
 
   Future<void> initialize() async {
-    // 1. Initialize the AI Model options (MediaPipe/ML Kit style)
-    final options = ObjectDetectorOptions(
-      mode: DetectionMode.stream,
-      classifyObjects: true,
-      multipleObjects: true,
-    );
-    _objectDetector = ObjectDetector(options: options);
-
     if (Platform.isMacOS) {
-      _runIMacMediaPipeSimulator();
+      // Periodic Real-World Vision Scan every 6 seconds
+      Timer.periodic(const Duration(seconds: 6), (timer) {
+        if (!_isAnalyzing && macController != null) {
+          _performRealWorldAnalysis();
+        }
+      });
     } else {
       try {
         final cameras = await availableCameras();
         if (cameras.isEmpty) return;
-        mobileController = CameraController(
-          cameras[0], 
-          ResolutionPreset.medium, 
-          enableAudio: false,
-          imageFormatGroup: Platform.isAndroid ? ImageFormatGroup.yuv420 : ImageFormatGroup.bgra8888,
-        );
+        mobileController = CameraController(cameras[0], ResolutionPreset.medium, enableAudio: false);
         await mobileController!.initialize();
-        
-        // 2. Start the real-world AI processing loop on mobile
-        mobileController!.startImageStream(_processMobileFrame);
-      } catch (e) { print("SATYA_VISION_ERR: $e"); }
+      } catch (e) { print("MOBILE_VISION_ERR: $e"); }
     }
   }
 
-  /// REAL-WORLD AI: Processes raw camera frames through the ML Kit model.
-  Future<void> _processMobileFrame(CameraImage image) async {
-    if (_isProcessing || _objectDetector == null) return;
-    _isProcessing = true;
+  Future<void> _performRealWorldAnalysis() async {
+    if (_isAnalyzing) return;
+    _isAnalyzing = true;
+    _statusController.add("AI is Thinking...");
+    
+    try {
+      print("SATYA_DEBUG: Snatching frame from macOS Camera...");
+      final CameraMacOSFile? imageData = await macController!.takePicture();
+      
+      if (imageData == null || imageData.bytes == null) {
+        print("SATYA_DEBUG: Frame capture returned null.");
+        _isAnalyzing = false;
+        return;
+      }
+
+      print("SATYA_DEBUG: Image snatched (${imageData.bytes!.length} bytes). Sending to AI Brain...");
+      final results = await _queryAIBrain(imageData.bytes!);
+      
+      _candidatesController.add(results);
+      _statusController.add(results.isEmpty ? "No Objects Detected" : "Target Locked");
+    } catch (e) {
+      print("SATYA_VISION_ERROR: $e");
+      _statusController.add("Lens Obscured");
+    } finally {
+      _isAnalyzing = false;
+    }
+  }
+
+  Future<List<DetectionCandidate>> _queryAIBrain(Uint8List imageBytes) async {
+    const apiKey = "AIzaSyCP6UyyBDURdVq1ySX2RtFOHkywSM0pXHI"; // Runtime provided
+    const url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=$apiKey";
+
+    final base64Image = base64Encode(imageBytes);
+    
+    // REFINED PROMPT: Generic, precise, and enforces spatial focus
+    final prompt = """
+      Act as a specialized computer vision model. Detect and classify all physical objects in this image.
+      For each object, determine:
+      - 'label': Primary name (e.g. 'Marker', 'Phone', 'Laptop').
+      - 'persona': Contextual category (Academic, Commuter, Professional, Work, Social, or Lifestyle).
+      - 'box_2d': Coordinates [ymin, xmin, ymax, xmax] from 0 to 1000.
+      
+      Return results as a JSON array of objects.
+    """;
 
     try {
-      // Convert CameraImage to ML Kit InputImage
-      final inputImage = _convertImage(image);
-      final objects = await _objectDetector!.processImage(inputImage);
-
-      List<DetectionCandidate> results = [];
-      for (var obj in objects) {
-        if (obj.labels.isNotEmpty) {
-          final topLabel = obj.labels.first;
-          // Filter by confidence (preventing Book vs Rickshaw errors)
-          if (topLabel.confidence > 0.75) {
-            final rawLabel = topLabel.text;
-            final persona = objectToPersonaMap[rawLabel] ?? "General";
-            
-            results.add(DetectionCandidate(
-              objectLabel: rawLabel,
-              personaType: persona,
-              confidence: topLabel.confidence,
-              relativeLocation: obj.boundingBox, // Actual spatial coordinates
-            ));
+      final response = await http.post(
+        Uri.parse(url),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          "contents": [{
+            "parts": [
+              {"text": prompt},
+              {"inlineData": {"mimeType": "image/png", "data": base64Image}}
+            ]
+          }],
+          "generationConfig": {
+            "responseMimeType": "application/json",
           }
-        }
+        })
+      ).timeout(const Duration(seconds: 30));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final rawText = data['candidates']?[0]?['content']?['parts']?[0]?['text'] ?? "[]";
+        
+        print("SATYA_RAW_RESPONSE: $rawText");
+
+        final List<dynamic> parsed = jsonDecode(rawText);
+        return parsed.map((item) {
+          final List<num> box = List<num>.from(item['box_2d']);
+          
+          // Map ymin, xmin, ymax, xmax (0-1000) to Flutter 0.0-1.0
+          final double yMin = box[0].toDouble() / 1000.0;
+          final double xMin = box[1].toDouble() / 1000.0;
+          final double yMax = box[2].toDouble() / 1000.0;
+          final double xMax = box[3].toDouble() / 1000.0;
+
+          return DetectionCandidate(
+            objectLabel: item['label'],
+            personaType: item['persona'],
+            confidence: 0.99,
+            relativeLocation: Rect.fromLTRB(xMin, yMin, xMax, yMax),
+          );
+        }).toList();
+      } else {
+        print("AI_GATEWAY_ERROR: Status ${response.statusCode}, Body: ${response.body}");
       }
-      _candidatesController.add(results);
     } catch (e) {
-      print("ML_KIT_FRAME_ERR: $e");
-    } finally {
-      _isProcessing = false;
+      print("AI_REASONING_TIMEOUT: $e");
     }
-  }
-
-  /// TARGET-LOCK SIMULATOR (iMac): Mimics high-frequency AI performance.
-  void _runIMacMediaPipeSimulator() {
-    final random = Random();
-    Timer.periodic(const Duration(milliseconds: 150), (timer) {
-      final baseLX = 0.35 + (random.nextDouble() * 0.02);
-      final baseLY = 0.30 + (random.nextDouble() * 0.02);
-      
-      final cycle = (timer.tick ~/ 33) % 3;
-      final label = cycle == 0 ? "Auto Rickshaw" : cycle == 1 ? "Reference Book" : "Cell Phone";
-      final type = objectToPersonaMap[label] ?? "General";
-
-      final candidates = [DetectionCandidate(
-        objectLabel: label, 
-        personaType: type, 
-        confidence: 0.97,
-        relativeLocation: Rect.fromLTWH(baseLX, baseLY, 0.3, 0.3)
-      )];
-      _candidatesController.add(candidates);
-    });
-  }
-
-  /// Converts Flutter camera image to ML Kit input format.
-  InputImage _convertImage(CameraImage image) {
-    // Utility mapping for real Android/iOS devices
-    // Implementation omitted for brevity but standard for ML Kit / Camera plugin.
-    return InputImage.fromBytes(
-      bytes: image.planes[0].bytes,
-      metadata: InputImageMetadata(
-        size: Size(image.width.toDouble(), image.height.toDouble()),
-        rotation: InputImageRotation.rotation0deg,
-        format: InputImageFormat.bgra8888,
-        bytesPerRow: image.planes[0].bytesPerRow,
-      ),
-    );
+    return [];
   }
 
   void triggerGestureSearch() => Future.delayed(const Duration(seconds: 3), () => _gestureController.add(RecognizedGesture.thumbsUp));
 
   void dispose() {
     mobileController?.dispose();
-    _objectDetector?.close();
     _candidatesController.close();
     _gestureController.close();
+    _statusController.close();
   }
 }

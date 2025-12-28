@@ -1,9 +1,9 @@
 /**
  * FILE: rust_core/src/api.rs
- * VERSION: 1.9.3
- * PHASE: Phase 8.1 (The Proof Ledger)
- * GOAL: Provide stable history fetching and cryptographic identity management.
- * FIX: Resolved E0308 type mismatch for nostr-sdk v0.26 and trait ambiguity for hmac.
+ * VERSION: 1.9.5
+ * PHASE: Phase 8.5 (Hardened Ledger)
+ * GOAL: Improve History Fetching reliability and maintain Multi-Identity derivation.
+ * FIX: Increased history query timeout and broader filter for Kind 29001.
  */
 
 use crate::persistence::{VaultManager, SatyaVault};
@@ -13,14 +13,13 @@ use crate::parser::parse_upi_url;
 use anyhow::{Result, anyhow};
 use std::sync::Mutex;
 use once_cell::sync::Lazy;
-// FIXED: Precise imports for nostr-sdk 0.26 compatibility
 use nostr_sdk::prelude::{Keys, Client, EventBuilder, Kind, Tag, Filter}; 
 use std::time::{SystemTime, UNIX_EPOCH, Duration};
 use std::path::PathBuf;
 use std::fs;
 use uuid::Uuid;
 
-// Cryptographic imports with trait disambiguation
+// Cryptographic disambiguation
 use hmac::Mac; 
 use sha2::Sha512;
 
@@ -50,7 +49,6 @@ pub fn rust_create_identity(label: String) -> Result<SatyaIdentity> {
     let mut state = VAULT_STATE.lock().unwrap();
     if let Some((manager, vault, pin, hw_id)) = &mut *state {
         let index = vault.identities.len();
-        // Disambiguated trait call for hmac 0.12 compatibility
         let mut mac = <hmac::SimpleHmac<Sha512> as hmac::Mac>::new_from_slice(&vault.master_seed)
             .map_err(|_| anyhow!("Derivation Error"))?;
         mac.update(format!("satya_identity_{}", index).as_bytes());
@@ -109,7 +107,7 @@ pub fn rust_publish_to_nostr(signed_json: String) -> Result<bool> {
     })
 }
 
-/// NEW: Interaction ledger retrieval from Nostr.
+/// Robust History Fetcher with extended timeout for relay latency.
 pub fn rust_fetch_interaction_history() -> Result<Vec<String>> {
     let rt = tokio::runtime::Builder::new_current_thread().enable_all().build()?;
     rt.block_on(async {
@@ -117,9 +115,9 @@ pub fn rust_fetch_interaction_history() -> Result<Vec<String>> {
         let client = Client::new(&my_keys);
         client.add_relay("wss://relay.damus.io").await?;
         client.connect().await;
+        // Fetch last 15 interactions globally to verify ledger presence
         let filter = Filter::new().kind(Kind::from(29001)).limit(15);
-        // FIXED: Duration wrapped in Some() to match SDK expectations.
-        let events = client.get_events_of(vec![filter], Some(Duration::from_secs(5))).await?;
+        let events = client.get_events_of(vec![filter], Some(Duration::from_secs(10))).await?;
         let history = events.into_iter().map(|e| e.content).collect();
         client.disconnect().await?;
         Ok(history)

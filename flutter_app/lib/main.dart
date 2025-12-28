@@ -1,9 +1,9 @@
 /**
  * FILE: flutter_app/lib/main.dart
- * VERSION: 2.6.0
- * PHASE: Phase 8.1 (Functional Reality Hub)
- * GOAL: Target-Locked Tracking Overlays and Stable Identity Selection.
- * FIX: Switched Dropdown to ID-based selection to prevent reference crashes.
+ * VERSION: 3.5.0
+ * PHASE: Phase 8.6 (Zero-Shot Reality)
+ * GOAL: Unified Hub for AI-Native Vision and Decentralized Ledger.
+ * FIX: Re-linked CameraMacOSController properly to VisionService and handled dynamic status.
  */
 
 import 'dart:io';
@@ -34,7 +34,11 @@ class SatyaApp extends StatelessWidget {
   final VisionService visionService;
   const SatyaApp({super.key, required this.vaultService, required this.repo, required this.visionService});
   @override Widget build(BuildContext context) {
-    return MaterialApp(debugShowCheckedModeBanner: false, theme: ThemeData(useMaterial3: true, colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF00FFC8), brightness: Brightness.dark)), home: UnlockScreen(vaultService: vaultService, repo: repo, visionService: visionService));
+    return MaterialApp(
+      debugShowCheckedModeBanner: false, 
+      theme: ThemeData(useMaterial3: true, colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF00FFC8), brightness: Brightness.dark)), 
+      home: UnlockScreen(vaultService: vaultService, repo: repo, visionService: visionService)
+    );
   }
 }
 
@@ -84,16 +88,18 @@ class _HomeScreenState extends State<HomeScreen> {
   List<SatyaIdentity> _identities = [];
   List<DetectionCandidate> _candidates = [];
   List<dynamic> _history = [];
-  String? _selectedIdentityId; // FIXED: Using ID for dropdown stability
+  String? _selectedIdentityId; 
   DetectionCandidate? _visionTarget;
   bool _isSigningPersona = false;
   bool _isSyncing = true;
+  String _aiStatus = "Initializing AI...";
 
   @override void initState() {
     super.initState();
     _refresh();
     widget.visionService.candidatesStream.listen((c) { if (mounted && !_isSigningPersona && _currentTab == 0) setState(() => _candidates = c); });
     widget.visionService.gestureStream.listen((g) { if (g == RecognizedGesture.thumbsUp && _visionTarget != null) _finalizeAdoption(); });
+    widget.visionService.statusStream.listen((s) { if (mounted) setState(() => _aiStatus = s); });
   }
 
   Future<void> _refresh() async {
@@ -118,7 +124,7 @@ class _HomeScreenState extends State<HomeScreen> {
         final code = capture.barcodes.first.rawValue;
         if (code != null && code.contains("upi://")) { Navigator.pop(context); _processUpi(code); }
       }),
-      if (Platform.isMacOS) Center(child: ElevatedButton(onPressed: () { Navigator.pop(context); _processUpi("upi://pay?pa=satya@bank&pn=Merchant&am=100&cu=INR"); }, child: const Text("Simulation: QR Detected")))
+      if (Platform.isMacOS) Center(child: ElevatedButton(onPressed: () { Navigator.pop(context); _processUpi("upi://pay?pa=satya@bank&pn=Merchant&am=250&cu=INR"); }, child: const Text("Simulation: QR Read")))
     ]))));
   }
 
@@ -133,7 +139,7 @@ class _HomeScreenState extends State<HomeScreen> {
       const Icon(LucideIcons.zap, color: Color(0xFF00FFC8), size: 54),
       const SizedBox(height: 12),
       Text("${data['amount']} ${data['currency']}", style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Color(0xFF00FFC8))),
-      Text("Pay to: ${data['name']}"),
+      Text("Adopt Payment Intent: ${data['name']}"),
       const Divider(height: 48, color: Colors.white10),
       const SizedBox(height: 32),
       SizedBox(width: double.infinity, child: ElevatedButton.icon(icon: const Icon(LucideIcons.send), onPressed: () async {
@@ -152,7 +158,6 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _finalizeAdoption() async {
-    // SEMANTIC ADOPTION: Automatically groups the object label into a Persona category.
     final label = "${_visionTarget!.personaType} (${_visionTarget!.objectLabel})";
     await widget.vaultService.createNewIdentity(label);
     setState(() { _isSigningPersona = false; _visionTarget = null; });
@@ -161,7 +166,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(_currentTab == 0 ? "SATYA LENS" : _currentTab == 1 ? "LEDGER" : "SETUP"), actions: [
+      appBar: AppBar(title: Text(_currentTab == 0 ? "SATYA LENS" : _currentTab == 1 ? "HISTORY" : "SETUP"), actions: [
         IconButton(icon: const Icon(LucideIcons.refreshCw, size: 18), onPressed: _refresh)
       ]),
       body: _buildBody(),
@@ -184,11 +189,10 @@ class _HomeScreenState extends State<HomeScreen> {
       return Stack(children: [
         Positioned.fill(child: Opacity(opacity: 0.4, child: Platform.isMacOS 
           ? CameraMacOSView(cameraMode: CameraMacOSMode.photo, onCameraInizialized: (c) => widget.visionService.macController = c)
-          : const Center(child: Text("Camera Feed Unloaded")))),
+          : const Center(child: Text("Camera Feed Unavailable")))),
         
-        // DYNAMIC TARGET-LOCKED RETICLES
         if (!_isSigningPersona)
-          ..._candidates.map((c) => _buildLockedReticle(c, constraints.maxWidth, constraints.maxHeight)),
+          ..._candidates.map((c) => _buildAnimatedReticle(c, constraints.maxWidth, constraints.maxHeight)),
 
         Column(children: [
           _buildIdentitySwitcher(),
@@ -201,8 +205,9 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  Widget _buildLockedReticle(DetectionCandidate c, double screenW, double screenH) {
-    return Positioned(
+  Widget _buildAnimatedReticle(DetectionCandidate c, double screenW, double screenH) {
+    return AnimatedPositioned(
+      duration: const Duration(milliseconds: 400),
       left: c.relativeLocation.left * screenW,
       top: c.relativeLocation.top * screenH,
       width: c.relativeLocation.width * screenW,
@@ -215,7 +220,7 @@ class _HomeScreenState extends State<HomeScreen> {
             margin: const EdgeInsets.only(top: 8),
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
             decoration: BoxDecoration(color: Colors.black87, borderRadius: BorderRadius.circular(4)),
-            child: Text(c.objectLabel.toUpperCase(), style: const TextStyle(fontSize: 10, color: Color(0xFF00FFC8), fontWeight: FontWeight.bold, letterSpacing: 1)),
+            child: Text("${c.personaType.toUpperCase()}: ${c.objectLabel.toUpperCase()}", style: const TextStyle(fontSize: 10, color: Color(0xFF00FFC8), fontWeight: FontWeight.bold, letterSpacing: 1)),
           ),
         ),
       ),
@@ -223,9 +228,10 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildIdentitySwitcher() => Container(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8), color: Colors.black87, child: Row(children: [
-    const Icon(LucideIcons.userCheck, size: 16, color: Color(0xFF00FFC8)),
+    const Icon(LucideIcons.zap, size: 16, color: Color(0xFF00FFC8)),
     const SizedBox(width: 12),
-    const Text("Active Signer: ", style: TextStyle(fontSize: 12, color: Colors.white54)),
+    Text(_aiStatus, style: const TextStyle(fontSize: 12, color: Colors.white54)),
+    const Spacer(),
     if (_identities.isNotEmpty) DropdownButton<String>(
       value: _selectedIdentityId, 
       underline: const SizedBox(), 
@@ -244,15 +250,14 @@ class _HomeScreenState extends State<HomeScreen> {
   ]));
 
   Widget _buildHistoryTab() {
-    return _isSyncing ? const Center(child: CircularProgressIndicator()) : ListView.builder(padding: const EdgeInsets.all(16), itemCount: _history.length, itemBuilder: (c, i) {
-      final payload = _history[i]['payload'];
-      final upi = payload['upi_data'];
-      return Card(color: Colors.white10, child: ListTile(
-        leading: const Icon(LucideIcons.fileSignature, color: Color(0xFF00FFC8)),
-        title: Text("Payment to ${upi['name']}"),
-        subtitle: Text("ID: ${_history[i]['signer_did']}", style: const TextStyle(fontSize: 8)),
-        trailing: Text("${upi['amount']} ${upi['currency']}", style: const TextStyle(color: Color(0xFF00FFC8))),
-      ));
+    if (_isSyncing) return const Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [CircularProgressIndicator(), SizedBox(height: 16), Text("Syncing Decentralized Ledger...")]));
+    if (_history.isEmpty) return Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [const Icon(LucideIcons.cloudOff, size: 48, color: Colors.white24), const SizedBox(height: 16), const Text("No History Found"), const SizedBox(height: 24), ElevatedButton(onPressed: _refresh, child: const Text("Force Sync"))]));
+    return ListView.builder(padding: const EdgeInsets.all(16), itemCount: _history.length, itemBuilder: (c, i) {
+      try {
+        final payload = _history[i]['payload'];
+        final upi = payload['upi_data'];
+        return Card(color: Colors.white10, child: ListTile(leading: const Icon(LucideIcons.fileSignature, color: Color(0xFF00FFC8)), title: Text("Payment to ${upi['name']}"), subtitle: Text("ID: ${_history[i]['signer_did']}", style: const TextStyle(fontSize: 8)), trailing: Text("${upi['amount']} ${upi['currency']}", style: const TextStyle(color: Color(0xFF00FFC8)))));
+      } catch (e) { return const SizedBox(); }
     });
   }
 
@@ -261,8 +266,13 @@ class _HomeScreenState extends State<HomeScreen> {
     const ListTile(title: Text("HD Root Seed"), subtitle: Text("Bound to local silicon.")),
     const Divider(color: Colors.white10),
     const Text("NETWORK PROXIMITY", style: TextStyle(color: Color(0xFF00FFC8), letterSpacing: 2, fontSize: 11)),
-    const ListTile(title: Text("Relay: Damus"), subtitle: Text("Connected • Public Protocol 29001 Active")),
+    const ListTile(title: Text("Relay: Damus"), subtitle: Text("Connected • Kind 29001 Active")),
+    ListTile(title: const Text("Status"), subtitle: Text(_aiStatus)),
     const SizedBox(height: 48),
-    ElevatedButton(onPressed: _refresh, child: const Text("Sync Ledger State"))
+    ElevatedButton(onPressed: () async {
+      final dir = await getApplicationSupportDirectory();
+      await widget.repo.resetVault(dir.path);
+      Future.delayed(const Duration(seconds: 1), () => exit(0));
+    }, style: ElevatedButton.styleFrom(backgroundColor: Colors.red.withOpacity(0.2)), child: const Text("Reset Local Data", style: TextStyle(color: Colors.redAccent)))
   ]);
 }
