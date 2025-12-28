@@ -1,8 +1,7 @@
 /**
  * FILE: rust_core/src/domain.rs
- * VERSION: 1.7.9
- * PHASE: Phase 7
- * DESCRIPTION: Defines the data structures exchanged between Rust and Dart.
+ * VERSION: 2.0.1
+ * PURPOSE: Extended domain for Ledger Verification.
  */
 
 use serde::{Deserialize, Serialize};
@@ -43,4 +42,6 @@ pub struct SignedIntent {
     pub payload: IntentPayload,
     pub signature_hex: String, 
     pub signer_did: String,
+    #[serde(default)]
+    pub is_verified: bool, 
 }

@@ -1,8 +1,8 @@
 /**
  * FILE: rust_core/src/crypto.rs
- * VERSION: 1.7.9
- * PHASE: Phase 7
- * DESCRIPTION: Core cryptographic primitives (Argon2, ChaCha20, Ed25519).
+ * VERSION: 2.0.1
+ * PHASE: Phase 9.0 (Verified Swarm)
+ * PURPOSE: Core cryptographic primitives with signature verification.
  */
 
 use argon2::{
@@ -14,7 +14,7 @@ use chacha20poly1305::{
     ChaCha20Poly1305, Nonce,
 };
 use anyhow::{Result, anyhow};
-use ed25519_dalek::{Keypair, Signer, SecretKey, PublicKey};
+use ed25519_dalek::{Keypair, Signer, Verifier, SecretKey, PublicKey, Signature};
 
 pub struct VaultKey([u8; 32]);
 
@@ -58,4 +58,11 @@ pub fn sign_with_key(priv_key: &[u8], message: &[u8]) -> Result<Vec<u8>> {
     let keypair = Keypair { secret, public };
     let signature = keypair.sign(message);
     Ok(signature.to_bytes().to_vec())
+}
+
+pub fn verify_with_key(pub_key_bytes: &[u8], message: &[u8], signature_bytes: &[u8]) -> Result<bool> {
+    let public = PublicKey::from_bytes(pub_key_bytes).map_err(|_| anyhow!("Invalid public key"))?;
+    let signature = Signature::from_bytes(signature_bytes).map_err(|_| anyhow!("Invalid signature format"))?;
+    public.verify(message, &signature).map_err(|e| anyhow!("Verification failed: {}", e))?;
+    Ok(true)
 }

@@ -41,7 +41,6 @@ abstract class RustCore {
 
   FlutterRustBridgeTaskConstMeta get kRustPublishToNostrConstMeta;
 
-  /// Robust History Fetcher with extended timeout for relay latency.
   Future<List<String>> rustFetchInteractionHistory({dynamic hint});
 
   FlutterRustBridgeTaskConstMeta get kRustFetchInteractionHistoryConstMeta;
