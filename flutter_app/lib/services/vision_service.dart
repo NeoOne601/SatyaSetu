@@ -1,8 +1,9 @@
 /**
  * FILE: flutter_app/lib/services/vision_service.dart
- * VERSION: 3.9.1
- * PHASE: Phase 9.0 (Zero-Shot Reality)
- * FIX: Incorporated 30s timeout and optimized detection prompt.
+ * VERSION: 4.3.0
+ * PHASE: Phase 9.2 (Hybrid Intelligence)
+ * GOAL: Dynamic Gemini -> Ollama Fallback with exhaustive logging.
+ * FIX: Integrated local Gemma 3 support and user-validated 30s timeouts.
  */
 
 import 'dart:async';
@@ -45,7 +46,8 @@ class VisionService {
 
   Future<void> initialize() async {
     if (Platform.isMacOS) {
-      Timer.periodic(const Duration(seconds: 6), (timer) {
+      debugPrint("flutter: SATYA_DEBUG: [VISION] Booting macOS Lens Loop (Hybrid Mode)...");
+      Timer.periodic(const Duration(seconds: 8), (timer) {
         if (!_isAnalyzing && macController != null) {
           _performRealWorldAnalysis();
         }
@@ -56,72 +58,121 @@ class VisionService {
         if (cameras.isEmpty) return;
         mobileController = CameraController(cameras[0], ResolutionPreset.medium, enableAudio: false);
         await mobileController!.initialize();
-      } catch (e) { print("MOBILE_VISION_ERR: $e"); }
+      } catch (e) { debugPrint("flutter: SATYA_DEBUG: [VISION] Mobile Camera Init Error: $e"); }
     }
   }
 
   Future<void> _performRealWorldAnalysis() async {
     if (_isAnalyzing) return;
     _isAnalyzing = true;
-    _statusController.add("AI Thinking...");
+    _statusController.add("AI Analysis in Progress...");
+    
     try {
       final CameraMacOSFile? imageData = await macController!.takePicture();
       if (imageData == null || imageData.bytes == null) {
+        debugPrint("flutter: SATYA_DEBUG: [VISION] Frame capture returned null.");
         _isAnalyzing = false;
         return;
       }
-      final results = await _queryAIBrain(imageData.bytes!);
+
+      debugPrint("flutter: SATYA_DEBUG: [VISION] Frame snatched (${imageData.bytes!.length} bytes). Engaging Hybrid Brain.");
+      final results = await _queryHybridBrain(imageData.bytes!);
       _candidatesController.add(results);
-      _statusController.add(results.isEmpty ? "Scanning..." : "Target Locked");
+      _statusController.add(results.isEmpty ? "No Object Detected" : "Target Locked");
     } catch (e) {
-      _statusController.add("Lens Muffled");
+      debugPrint("flutter: SATYA_DEBUG: [VISION] Fatal analysis failure: $e");
+      _statusController.add("Lens Obscured");
     } finally {
       _isAnalyzing = false;
     }
   }
 
-  Future<List<DetectionCandidate>> _queryAIBrain(Uint8List imageBytes) async {
-    const apiKey = "YOUR_API_KEY"; 
+  /// THE HYBRID COORDINATOR: Switches between Cloud (Gemini) and Local (Ollama)
+  Future<List<DetectionCandidate>> _queryHybridBrain(Uint8List imageBytes) async {
+    try {
+      // 1. Attempt Cloud Analysis (Gemini)
+      return await _queryGemini(imageBytes);
+    } catch (e) {
+      debugPrint("flutter: SATYA_DEBUG: [VISION] Gemini Unavailable/Limited. Shifting to Local Ollama...");
+      _statusController.add("Local Brain Active");
+      return await _queryOllama(imageBytes);
+    }
+  }
+
+  Future<List<DetectionCandidate>> _queryGemini(Uint8List imageBytes) async {
+    const apiKey = "YOUR_API_KEY_HERE"; // Ensure key is set locally
+    if (apiKey == "YOUR_API_KEY_HERE") throw Exception("No Gemini Key");
+
     const url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=$apiKey";
     final base64Image = base64Encode(imageBytes);
-    
-    // REFINED PROMPT: Uses generic expert context for higher zero-shot accuracy
-    const prompt = "Act as a Computer Vision Assistant. Detect objects. Return ONLY a JSON array of objects with 'label', 'persona' (Academic, Commuter, Professional, Work, Social, or Lifestyle), and 'box_2d' [ymin, xmin, ymax, xmax] (0-1000).";
+    const prompt = "Act as a Computer Vision Expert. Detect primary physical objects. Return ONLY a raw JSON array of objects with keys 'label', 'persona' (Academic, Commuter, Professional, Work, Social, or Lifestyle), and 'box_2d' [ymin, xmin, ymax, xmax] (0-1000).";
+
+    final response = await http.post(
+      Uri.parse(url),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        "contents": [{"parts": [{"text": prompt}, {"inlineData": {"mimeType": "image/png", "data": base64Image}}]}]
+      })
+    ).timeout(const Duration(seconds: 30));
+
+    if (response.statusCode == 200) {
+      debugPrint("flutter: SATYA_DEBUG: [VISION] Gemini Analysis Successful.");
+      final text = jsonDecode(response.body)['candidates'][0]['content']['parts'][0]['text'];
+      return _parseJson(text);
+    }
+    throw Exception("Gemini Status: ${response.statusCode}");
+  }
+
+  /// OLLAMA BRAIN: Communicates with your local gemma3 instance
+  Future<List<DetectionCandidate>> _queryOllama(Uint8List imageBytes) async {
+    const url = "http://localhost:11434/api/generate";
+    final base64Image = base64Encode(imageBytes);
+    const prompt = "Identify physical objects in this image. For each, give a one-word label, a persona category (Academic, Commuter, Professional, Work, Social, or Lifestyle), and a normalized bounding box [ymin, xmin, ymax, xmax] from 0 to 1000. Return ONLY as a JSON array.";
 
     try {
+      debugPrint("flutter: SATYA_DEBUG: [VISION] Calling Local Ollama (Gemma 3)...");
       final response = await http.post(
         Uri.parse(url),
-        headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
-          "contents": [{
-            "parts": [
-              {"text": prompt},
-              {"inlineData": {"mimeType": "image/png", "data": base64Image}}
-            ]
-          }],
-          "generationConfig": {"responseMimeType": "application/json"}
+          "model": "gemma3:27b", 
+          "prompt": prompt,
+          "images": [base64Image],
+          "stream": false,
+          "format": "json"
         })
-      ).timeout(const Duration(seconds: 30)); 
+      ).timeout(const Duration(seconds: 40));
 
       if (response.statusCode == 200) {
+        debugPrint("flutter: SATYA_DEBUG: [VISION] Local Ollama Analysis Successful.");
         final data = jsonDecode(response.body);
-        final rawText = data['candidates']?[0]?['content']?['parts']?[0]?['text'] ?? "[]";
-        final List<dynamic> parsed = jsonDecode(rawText);
-        return parsed.map((item) {
-          final box = List<num>.from(item['box_2d']);
-          return DetectionCandidate(
-            objectLabel: item['label'],
-            personaType: item['persona'],
-            confidence: 0.99,
-            relativeLocation: Rect.fromLTRB(
-              box[1].toDouble() / 1000.0, box[0].toDouble() / 1000.0, 
-              box[3].toDouble() / 1000.0, box[2].toDouble() / 1000.0
-            ),
-          );
-        }).toList();
+        return _parseJson(data['response']);
       }
-    } catch (e) { print("AI_VISION_LATENCY: $e"); }
+    } catch (e) {
+      debugPrint("flutter: SATYA_DEBUG: [VISION] Local Ollama Brain Unreachable: $e");
+    }
     return [];
+  }
+
+  List<DetectionCandidate> _parseJson(String rawText) {
+    try {
+      final cleaned = rawText.replaceAll('```json', '').replaceAll('```', '').trim();
+      final List<dynamic> parsed = jsonDecode(cleaned);
+      return parsed.map((item) {
+        final box = List<num>.from(item['box_2d']);
+        return DetectionCandidate(
+          objectLabel: item['label'],
+          personaType: item['persona'],
+          confidence: 0.99,
+          relativeLocation: Rect.fromLTRB(
+            box[1].toDouble() / 1000.0, box[0].toDouble() / 1000.0, 
+            box[3].toDouble() / 1000.0, box[2].toDouble() / 1000.0
+          ),
+        );
+      }).toList();
+    } catch (e) {
+      debugPrint("flutter: SATYA_DEBUG: [VISION] JSON Structural mismatch or empty response.");
+      return [];
+    }
   }
 
   void triggerGestureSearch() => Future.delayed(const Duration(seconds: 3), () => _gestureController.add(RecognizedGesture.thumbsUp));
