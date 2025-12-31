@@ -1,13 +1,16 @@
 /**
  * FILE: flutter_app/lib/main.dart
- * VERSION: 4.3.0
- * PHASE: Phase 9.2 (Hybrid Intelligence)
- * GOAL: Fix QR FAB visibility and enable deep SATYA_DEBUG tracing.
- * FIX: Moved FAB to Scaffold level and linked Vision Status stream.
+ * VERSION: 29.0.0
+ * PHASE: Phase 42.0 (Atomic Semantic UI)
+ * FIX: 
+ * 1. Semantic Color Logic: Intelligently separates Living from Objects.
+ * 2. Visual Persistence: 0.7px borders for high-density object detection.
+ * 3. Fluidity: Faster reticle animations (150ms).
  */
 
 import 'dart:io';
 import 'dart:convert';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
@@ -25,7 +28,7 @@ void main() async {
   final repo = IdentityRepository();
   final vaultService = VaultService(repo);
   final visionService = VisionService();
-  debugPrint("flutter: SATYA_DEBUG: [SYSTEM] Application Launch sequence.");
+  debugPrint("flutter: SATYA_DEBUG: [SYSTEM] Bootstrap.");
   runApp(SatyaApp(vaultService: vaultService, repo: repo, visionService: visionService));
 }
 
@@ -35,7 +38,11 @@ class SatyaApp extends StatelessWidget {
   final VisionService visionService;
   const SatyaApp({super.key, required this.vaultService, required this.repo, required this.visionService});
   @override Widget build(BuildContext context) {
-    return MaterialApp(debugShowCheckedModeBanner: false, theme: ThemeData(useMaterial3: true, colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF00FFC8), brightness: Brightness.dark)), home: UnlockScreen(vaultService: vaultService, repo: repo, visionService: visionService));
+    return MaterialApp(
+      debugShowCheckedModeBanner: false, 
+      theme: ThemeData(useMaterial3: true, colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF00FFC8), brightness: Brightness.dark)), 
+      home: UnlockScreen(vaultService: vaultService, repo: repo, visionService: visionService)
+    );
   }
 }
 
@@ -57,15 +64,10 @@ class _UnlockScreenState extends State<UnlockScreen> {
     final directory = await getApplicationSupportDirectory();
     final hwId = await HardwareIdService.getDeviceId();
     
-    debugPrint("flutter: SATYA_DEBUG: [AUTH] Unlock attempt on device: $hwId");
     final ok = await widget.vaultService.unlock(_pinController.text, hwId, directory.path);
-    
     if (ok && mounted) {
-      debugPrint("flutter: SATYA_DEBUG: [AUTH] Success. Initializing Neural Pathways.");
-      await widget.visionService.initialize();
       Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => HomeScreen(vaultService: widget.vaultService, repo: widget.repo, visionService: widget.visionService)));
     } else { 
-      debugPrint("flutter: SATYA_DEBUG: [AUTH] Invalid Credentials.");
       setState(() => _isLoading = false); 
       _pinController.clear(); 
     }
@@ -96,23 +98,29 @@ class _HomeScreenState extends State<HomeScreen> {
   List<DetectionCandidate> _candidates = [];
   List<dynamic> _history = [];
   String? _selectedIdentityId; 
-  bool _isSigningPersona = false;
   bool _isSyncing = true;
-  String _aiStatus = "Awaiting Vision...";
+  String _aiStatus = "Sensing Reality...";
 
   @override void initState() {
     super.initState();
     _refresh();
-    widget.visionService.candidatesStream.listen((c) { if (mounted && !_isSigningPersona && _currentTab == 0) setState(() => _candidates = c); });
-    widget.visionService.statusStream.listen((s) { if (mounted) setState(() => _aiStatus = s); });
+    widget.visionService.initialize();
+
+    widget.visionService.candidatesStream.listen((c) {
+      if (mounted && _currentTab == 0) {
+        setState(() => _candidates = c);
+      }
+    });
+
+    widget.visionService.statusStream.listen((s) {
+      if (mounted) setState(() => _aiStatus = s);
+    });
   }
 
   Future<void> _refresh() async {
     setState(() => _isSyncing = true);
-    debugPrint("flutter: SATYA_DEBUG: [SYNC] Refreshing global state from Swarm...");
     final list = await widget.repo.getIdentities();
     final hStrings = await widget.repo.fetchInteractionHistory();
-    debugPrint("flutter: SATYA_DEBUG: [SYNC] State Loaded. IDs: ${list.length}, Proofs: ${hStrings.length}");
     setState(() { 
       _identities = list; 
       _history = hStrings.map((s) => jsonDecode(s)).toList();
@@ -122,20 +130,17 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _openRealScanner() {
-    debugPrint("flutter: SATYA_DEBUG: [UI] Activating VAMPIRE READ Scanner.");
     Navigator.of(context).push(MaterialPageRoute(builder: (context) => Scaffold(appBar: AppBar(title: const Text("VAMPIRE READ")), body: Stack(children: [
       MobileScanner(onDetect: (capture) {
         final code = capture.barcodes.first.rawValue;
         if (code != null && code.contains("upi://")) { 
-          debugPrint("flutter: SATYA_DEBUG: [VISION] Physical QR Parsed.");
           Navigator.pop(context); 
           _processUpi(code); 
         }
       }),
       if (Platform.isMacOS) Center(child: ElevatedButton(onPressed: () { 
-        debugPrint("flutter: SATYA_DEBUG: [VISION] iMac QR Simulation Triggered.");
         Navigator.pop(context); 
-        _processUpi("upi://pay?pa=satya@bank&pn=SatyaRetail&am=999&cu=INR"); 
+        _processUpi("upi://pay?pa=satya@bank&pn=SatyaAppleTier&am=100&cu=INR"); 
       }, child: const Text("Simulation: QR Simulated")))
     ]))));
   }
@@ -155,7 +160,6 @@ class _HomeScreenState extends State<HomeScreen> {
       SizedBox(width: double.infinity, child: ElevatedButton.icon(icon: const Icon(LucideIcons.send), onPressed: () async {
         Navigator.pop(c);
         if (_selectedIdentityId == null) return;
-        debugPrint("flutter: SATYA_DEBUG: [SIGNER] Encoding proof for decentralized swarm.");
         final signed = await widget.repo.signIntent(_selectedIdentityId!, raw);
         await widget.repo.publishToNostr(signed);
         _refresh();
@@ -165,7 +169,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(_currentTab == 0 ? "SATYA LENS" : _currentTab == 1 ? "PROOF LEDGER" : "SETUP"), actions: [IconButton(icon: const Icon(LucideIcons.refreshCw, size: 18), onPressed: _refresh)]),
+      appBar: AppBar(title: Text(_currentTab == 0 ? "IDENTITY LENS" : _currentTab == 1 ? "PROOF LEDGER" : "SETUP"), actions: [IconButton(icon: const Icon(LucideIcons.refreshCw, size: 18), onPressed: _refresh)]),
       body: _buildBody(),
       floatingActionButton: _currentTab == 0 ? FloatingActionButton.extended(
         onPressed: _openRealScanner, 
@@ -191,9 +195,14 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildScannerTab() => LayoutBuilder(builder: (context, constraints) {
     return Stack(children: [
       Positioned.fill(child: Opacity(opacity: 0.4, child: Platform.isMacOS 
-        ? CameraMacOSView(cameraMode: CameraMacOSMode.photo, onCameraInizialized: (c) => widget.visionService.macController = c)
-        : const Center(child: Text("Camera Feed Bound")))),
+        ? CameraMacOSView(
+            cameraMode: CameraMacOSMode.photo, 
+            onCameraInizialized: (c) => widget.visionService.attachCamera(c)
+          )
+        : const Center(child: Text("Silicon Feed Bound")))),
+      
       ..._candidates.map((c) => _buildAnimatedReticle(c, constraints.maxWidth, constraints.maxHeight)),
+      
       Column(children: [
         _buildIdentitySwitcher(),
         const Spacer(),
@@ -201,17 +210,38 @@ class _HomeScreenState extends State<HomeScreen> {
     ]);
   });
 
-  Widget _buildAnimatedReticle(DetectionCandidate c, double screenW, double screenH) => AnimatedPositioned(
-    duration: const Duration(milliseconds: 400),
-    left: c.relativeLocation.left * screenW,
-    top: c.relativeLocation.top * screenH,
-    width: c.relativeLocation.width * screenW,
-    height: c.relativeLocation.height * screenH,
-    child: Container(
-      decoration: BoxDecoration(border: Border.all(color: const Color(0xFF00FFC8).withOpacity(0.6), width: 1.5), borderRadius: BorderRadius.circular(16)),
-      child: Align(alignment: Alignment.topCenter, child: Container(margin: const EdgeInsets.only(top: 8), padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2), decoration: BoxDecoration(color: Colors.black87, borderRadius: BorderRadius.circular(4)), child: Text("${c.personaType.toUpperCase()}: ${c.objectLabel.toUpperCase()}", style: const TextStyle(fontSize: 10, color: Color(0xFF00FFC8), fontWeight: FontWeight.bold, letterSpacing: 1)))),
-    ),
-  );
+  Widget _buildAnimatedReticle(DetectionCandidate c, double screenW, double screenH) {
+    // ATOMIC SEMANTIC COLOR LOGIC
+    // Living beings = Neon Red, Objects = Satya Green.
+    final Color reticleColor = c.isLiving ? const Color(0xFFFF4545) : const Color(0xFF00FFC8);
+
+    return AnimatedPositioned(
+      duration: const Duration(milliseconds: 150),
+      left: c.relativeLocation.left * screenW,
+      top: c.relativeLocation.top * screenH,
+      width: c.relativeLocation.width * screenW,
+      height: c.relativeLocation.height * screenH,
+      child: Container(
+        decoration: BoxDecoration(
+          border: Border.all(color: reticleColor.withOpacity(0.8), width: 0.7), 
+          borderRadius: BorderRadius.circular(4)
+        ),
+        child: Stack(children: [
+          Positioned(
+            top: 0.5, left: 0.5,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 0.5), 
+              decoration: BoxDecoration(color: Colors.black45, borderRadius: BorderRadius.circular(2)), 
+              child: Text(
+                c.objectLabel, 
+                style: TextStyle(fontSize: 5, color: reticleColor, fontWeight: FontWeight.bold, letterSpacing: 0.1)
+              )
+            )
+          )
+        ]),
+      ),
+    );
+  }
 
   Widget _buildIdentitySwitcher() => Container(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8), color: Colors.black87, child: Row(children: [
     const Icon(LucideIcons.zap, size: 16, color: Color(0xFF00FFC8)),
@@ -242,7 +272,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildSetupTab() => ListView(padding: const EdgeInsets.all(24), children: [
     const Text("VAULT SECURITY", style: TextStyle(color: Color(0xFF00FFC8), letterSpacing: 2, fontSize: 11)),
-    const ListTile(title: Text("HD Root Seed"), subtitle: Text("Bound to silicon entropy.")),
+    const ListTile(title: Text("HD Root Seed"), subtitle: Text("Bound to silicon entropy active.")),
     const Divider(color: Colors.white10),
     const Text("NETWORK PROXIMITY", style: TextStyle(color: Color(0xFF00FFC8), letterSpacing: 2, fontSize: 11)),
     const ListTile(title: Text("Swarm Relays"), subtitle: Text("Damus, Nostr.band - ACTIVE")),

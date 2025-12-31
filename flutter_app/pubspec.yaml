@@ -39,6 +39,9 @@ dependencies:
   # NEW: Required for dynamic Gemini AI categorization
   http: ^1.2.0
 
+  # NEW: Required for resizing images before sending to Ollama/Gemini
+  image: ^4.2.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
