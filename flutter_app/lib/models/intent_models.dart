@@ -1,11 +1,14 @@
 /**
  * FILE: flutter_app/lib/models/intent_models.dart
- * PURPOSE: Data structures for the Morphic Intent Engine.
+ * VERSION: 1.1.0
+ * PHASE: Phase 49.0 (Ontological Intent)
+ * AUTHOR: SatyaSetu Internal Neural Team
+ * DESCRIPTION: Data models for dynamic situational morphing.
  */
 
 import 'package:flutter/material.dart';
 
-enum SituationContext { global, mandi, education, finance, domestic }
+enum SituationContext { global, trade, education, finance, domestic, logistics }
 
 class MorphicAction {
   final String label;
