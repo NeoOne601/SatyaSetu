@@ -1,8 +1,12 @@
 /**
  * FILE: flutter_app/lib/main.dart
- * VERSION: 31.0.0
- * PHASE: Phase 47.3 (Morphic UI Interaction)
- * DESCRIPTION: Implements floating interactive tiles that trigger context-aware cards.
+ * VERSION: 33.0.0
+ * PHASE: Phase 48.0 (Hardware-Bound Intent UI)
+ * AUTHOR: SatyaSetu Internal Neural Team
+ * FIX: 
+ * 1. Unlock Restoration: Restored HardwareIdService call to fix vault access.
+ * 2. Morphic UI: Implemented floating interaction tiles for situational intent.
+ * 3. Feedback Loop: Added visual loading indicators for unlock state.
  */
 
 import 'dart:io';
@@ -14,6 +18,7 @@ import 'package:lucide_icons/lucide_icons.dart';
 import 'package:camera_macos/camera_macos.dart';
 import 'services/vault_service.dart';
 import 'services/vision_service.dart';
+import 'services/hardware_id_service.dart';
 import 'identity_repo.dart';
 import 'models/intent_models.dart';
 
@@ -22,6 +27,7 @@ void main() async {
   final repo = IdentityRepository();
   final vaultService = VaultService(repo);
   final visionService = VisionService();
+  debugPrint("flutter: SATYA_DEBUG: [SYSTEM] Core Bootstrap.");
   runApp(SatyaApp(vaultService: vaultService, repo: repo, visionService: visionService));
 }
 
@@ -32,7 +38,10 @@ class SatyaApp extends StatelessWidget {
   const SatyaApp({super.key, required this.vaultService, required this.repo, required this.visionService});
   @override Widget build(BuildContext context) => MaterialApp(
     debugShowCheckedModeBanner: false, 
-    theme: ThemeData(useMaterial3: true, colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF00FFC8), brightness: Brightness.dark)), 
+    theme: ThemeData(
+      useMaterial3: true, 
+      colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF00FFC8), brightness: Brightness.dark),
+    ), 
     home: UnlockScreen(vaultService: vaultService, repo: repo, visionService: visionService)
   );
 }
@@ -47,18 +56,39 @@ class UnlockScreen extends StatefulWidget {
 
 class _UnlockScreenState extends State<UnlockScreen> {
   final TextEditingController _pinController = TextEditingController();
+  bool _isLoading = false;
+
   Future<void> _attemptUnlock() async {
     if (_pinController.text.length < 6) return;
-    final directory = await getApplicationSupportDirectory();
-    final ok = await widget.vaultService.unlock(_pinController.text, "HW-ID-MAC", directory.path);
-    if (ok && mounted) Navigator.of(context).pushReplacement(MaterialPageRoute(builder: (_) => HomeScreen(vaultService: widget.vaultService, repo: widget.repo, visionService: widget.visionService)));
+    setState(() => _isLoading = true);
+    
+    try {
+      final directory = await getApplicationSupportDirectory();
+      // FIX: Restored Real Hardware ID binding for cryptographic consistency
+      final hwId = await HardwareIdService.getDeviceId(); 
+      
+      final ok = await widget.vaultService.unlock(_pinController.text, hwId, directory.path);
+      if (ok && mounted) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => HomeScreen(vaultService: widget.vaultService, repo: widget.repo, visionService: widget.visionService))
+        );
+      } else {
+        setState(() => _isLoading = false);
+        _pinController.clear();
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Vault Authentication Failed")));
+      }
+    } catch (e) {
+      setState(() => _isLoading = false);
+      debugPrint("flutter: SATYA_DEBUG: [UNLOCK] Critical Fail: $e");
+    }
   }
+
   @override Widget build(BuildContext context) => Scaffold(body: Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
     const Icon(LucideIcons.shieldCheck, size: 80, color: Color(0xFF00FFC8)),
     const SizedBox(height: 48),
     Container(constraints: const BoxConstraints(maxWidth: 300), child: TextField(controller: _pinController, obscureText: true, textAlign: TextAlign.center, decoration: const InputDecoration(hintText: "••••••"), keyboardType: TextInputType.number, onChanged: (v) { if (v.length == 6) _attemptUnlock(); })),
     const SizedBox(height: 32),
-    ElevatedButton(onPressed: _attemptUnlock, child: const Text("Unlock Identity Vault"))
+    _isLoading ? const CircularProgressIndicator(color: Color(0xFF00FFC8)) : ElevatedButton(onPressed: _attemptUnlock, child: const Text("Unlock Identity Vault"))
   ])));
 }
 
@@ -85,18 +115,18 @@ class _HomeScreenState extends State<HomeScreen> {
     final state = candidate.situation;
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.black.withOpacity(0.9),
+      backgroundColor: Colors.black.withOpacity(0.95),
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(32))),
-      builder: (c) => Padding(
+      builder: (c) => Container(
         padding: const EdgeInsets.all(32.0),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2))),
             const SizedBox(height: 24),
-            Text(state.title.toUpperCase(), style: TextStyle(letterSpacing: 2, fontSize: 10, color: state.themeColor)),
+            Text(state.title.toUpperCase(), style: TextStyle(letterSpacing: 2, fontSize: 10, color: state.themeColor, fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
-            Text(candidate.objectLabel, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
+            Text(candidate.objectLabel, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
             const Divider(height: 40, color: Colors.white10),
             ...state.actions.map((action) => ListTile(
               onTap: () {
@@ -104,10 +134,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 action.onExecute(context);
               },
               leading: Icon(action.icon, color: state.themeColor),
-              title: Text(action.label),
+              title: Text(action.label, style: const TextStyle(fontWeight: FontWeight.bold)),
               subtitle: Text(action.description, style: const TextStyle(fontSize: 10, color: Colors.white54)),
-              trailing: const Icon(LucideIcons.chevronRight, size: 16),
+              trailing: const Icon(LucideIcons.chevronRight, size: 16, color: Colors.white24),
             )),
+            const SizedBox(height: 16),
           ],
         ),
       ),
@@ -121,12 +152,12 @@ class _HomeScreenState extends State<HomeScreen> {
         return Stack(children: [
           Positioned.fill(child: Opacity(opacity: 0.5, child: CameraMacOSView(cameraMode: CameraMacOSMode.photo, onCameraInizialized: (c) => widget.visionService.attachCamera(c)))),
           
-          // FLOATING MORPHIC TILES
+          // FLOATING MORPHIC TILES: The "Invitations" to interact
           ..._candidates.map((c) => _buildMorphicTile(c, constraints.maxWidth, constraints.maxHeight)),
           
           const Positioned(top: 60, left: 24, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text("SATYA SETU", style: TextStyle(letterSpacing: 4, fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF00FFC8))),
-            Text("INTENT OVERLAY ACTIVE", style: TextStyle(fontSize: 8, color: Colors.white38)),
+            Text("SITUATIONAL INTENT ACTIVE", style: TextStyle(fontSize: 8, color: Colors.white38)),
           ])),
         ]);
       }),
@@ -147,8 +178,8 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Container(
           decoration: BoxDecoration(
             color: color.withOpacity(0.05),
-            border: Border.all(color: color.withOpacity(0.6), width: 1.0),
-            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: color.withOpacity(0.8), width: 0.8),
+            borderRadius: BorderRadius.circular(8),
           ),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.end,
@@ -156,8 +187,20 @@ class _HomeScreenState extends State<HomeScreen> {
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-                decoration: BoxDecoration(color: color.withOpacity(0.8), borderRadius: const BorderRadius.vertical(bottom: Radius.circular(10))),
-                child: Text(c.objectLabel, style: const TextStyle(fontSize: 7, fontWeight: FontWeight.bold, color: Colors.black), textAlign: TextAlign.center, overflow: TextOverflow.ellipsis),
+                decoration: BoxDecoration(color: color.withOpacity(0.85), borderRadius: const BorderRadius.vertical(bottom: Radius.circular(6))),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(LucideIcons.zap, size: 8, color: Colors.black.withOpacity(0.5)),
+                    const SizedBox(width: 4),
+                    Flexible(child: Text(
+                      c.objectLabel, 
+                      style: const TextStyle(fontSize: 6.5, fontWeight: FontWeight.bold, color: Colors.black), 
+                      textAlign: TextAlign.center, 
+                      overflow: TextOverflow.ellipsis
+                    )),
+                  ],
+                ),
               ),
             ],
           ),
