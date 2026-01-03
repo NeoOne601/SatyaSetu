@@ -1,25 +1,26 @@
 /**
  * FILE: flutter_app/lib/models/intent_models.dart
- * VERSION: 1.1.0
- * PHASE: Phase 49.0 (Ontological Intent)
- * AUTHOR: SatyaSetu Internal Neural Team
- * DESCRIPTION: Data models for dynamic situational morphing.
+ * VERSION: 1.2.0
+ * PHASE: Phase 55.1 (Action Payloads)
+ * AUTHOR: SatyaSetu Mission Systems
  */
 
 import 'package:flutter/material.dart';
 
-enum SituationContext { global, trade, education, finance, domestic, logistics }
+enum SituationContext { global, trade, education, finance, domestic }
 
 class MorphicAction {
   final String label;
   final IconData icon;
   final String description;
+  final String payloadType; // NEW: Tells UI what kind of interaction to show (input/rate/info)
   final Function(BuildContext context) onExecute;
 
   MorphicAction({
     required this.label,
     required this.icon,
     required this.description,
+    required this.payloadType,
     required this.onExecute,
   });
 }

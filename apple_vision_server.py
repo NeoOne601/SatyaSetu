@@ -1,7 +1,8 @@
 # FILE: apple_vision_server.py
-# PURPOSE: SatyaSetu "Zero-Stack" Cognitive Engine.
-# VERSION: 8.6.0 (Final Thermal Stability Release)
-# DESCRIPTION: Combined token capping, forced GPU flushing, and greedy decoding.
+# PURPOSE: SatyaSetu "Contextual Eye" Engine.
+# VERSION: 8.7.0 (Contextual Awareness Release)
+# DESCRIPTION: Adds Global Scene Captioning to provide environment context 
+# to the Intent Engine without needing Gemini API calls for every object.
 
 import uvicorn
 from fastapi import FastAPI, Request, Response
@@ -16,35 +17,18 @@ import gc
 
 app = FastAPI()
 
-print("\n" + "="*60)
-print("   SATYA COGNITIVE BRIDGE v8.6.0")
-print("   Intelligence: Florence-2 (Zero-Stack)")
-print("="*60)
-
 def initialize_brain():
     try:
         model_id = 'microsoft/Florence-2-base'
-        print(f"[ENGINE] Mounting Neural Core: {model_id}...")
-        
         config = AutoConfig.from_pretrained(model_id, trust_remote_code=True)
-        # Optimization: num_beams=1 requires early_stopping to be False
         config.early_stopping = False 
-        
-        if not hasattr(config, 'forced_bos_token_id'):
-            config.forced_bos_token_id = None
-        
         model = AutoModelForCausalLM.from_pretrained(model_id, config=config, trust_remote_code=True)
         processor = AutoProcessor.from_pretrained(model_id, trust_remote_code=True)
-        
-        # USE METAL (MPS)
         device = "mps" if torch.backends.mps.is_available() else "cpu"
         model.to(device)
         model.eval()
-        
-        print(f"SUCCESS: Brain active on {device.upper()}.")
         return model, processor, device
     except Exception as e:
-        print(f"[FATAL] Brain load failure: {e}")
         os._exit(1)
 
 model, processor, device = initialize_brain()
@@ -57,62 +41,46 @@ async def vision(request: Request):
         img_data = base64.b64decode(payload['images'][0])
         image = Image.open(io.BytesIO(img_data)).convert("RGB")
         
-        # TASK: DENSE REGION CAPTION
-        # This describes every sub-region including held objects.
-        prompt = "<DENSE_REGION_CAPTION>"
-        
-        with torch.inference_mode():
-            inputs = processor(text=prompt, images=image, return_tensors="pt").to(device)
-            
-            # STABILITY CALIBRATION:
-            # 1. max_new_tokens=64: Stops the "Footwear" loop.
-            # 2. repetition_penalty=1.3: Forces model to find small objects (pens).
-            generated_ids = model.generate(
-                input_ids=inputs["input_ids"],
-                pixel_values=inputs["pixel_values"],
-                max_new_tokens=64,
-                num_beams=1,
-                repetition_penalty=1.3,
-                do_sample=False
-            )
-            
-            response_text = processor.batch_decode(generated_ids, skip_special_tokens=False)[0]
-            prediction = processor.post_process_generation(
-                response_text, 
-                task=prompt, 
-                image_size=(image.width, image.height)
-            )
+        # --- TASK 1: DENSE REGION CAPTION (The Objects) ---
+        dense_prompt = "<DENSE_REGION_CAPTION>"
+        # --- TASK 2: DETAILED CAPTION (The Environment) ---
+        scene_prompt = "<DETAILED_CAPTION>"
         
         results = []
-        data = prediction[prompt]
+        scene_context = ""
+
+        with torch.inference_mode():
+            # 1. Perception Pulse
+            inputs = processor(text=dense_prompt, images=image, return_tensors="pt").to(device)
+            generated_ids = model.generate(input_ids=inputs["input_ids"], pixel_values=inputs["pixel_values"], max_new_tokens=64, num_beams=1)
+            response_text = processor.batch_decode(generated_ids, skip_special_tokens=False)[0]
+            prediction = processor.post_process_generation(response_text, task=dense_prompt, image_size=(image.width, image.height))
+            
+            # 2. Context Pulse (Understand the environment locally)
+            scene_inputs = processor(text=scene_prompt, images=image, return_tensors="pt").to(device)
+            scene_ids = model.generate(input_ids=scene_inputs["input_ids"], pixel_values=scene_inputs["pixel_values"], max_new_tokens=32)
+            scene_context = processor.batch_decode(scene_ids, skip_special_tokens=True)[0]
+
+        data = prediction[dense_prompt]
         if 'bboxes' in data:
             for i in range(len(data['bboxes'])):
-                box = data['bboxes'][i] # Format: [xmin, ymin, xmax, ymax]
+                box = data['bboxes'][i]
                 label = data['labels'][i]
-                
                 results.append({
                     "label": label.upper(),
-                    "box_2d": [
-                        float(box[0] / image.width * 1000), 
-                        float(box[1] / image.height * 1000), 
-                        float(box[2] / image.width * 1000),  
-                        float(box[3] / image.height * 1000)  
-                    ]
+                    "box_2d": [float(box[0]/image.width*1000), float(box[1]/image.height*1000), float(box[2]/image.width*1000), float(box[3]/image.height*1000)]
                 })
 
-        # CRITICAL: M1 SILICON MEMORY FLUSH
-        # This prevents the 5s -> 54s latency death spiral.
-        del inputs, generated_ids, image
-        if device == "mps":
-            torch.mps.empty_cache()
+        torch.mps.empty_cache()
         gc.collect()
 
-        duration = time.time() - start_time
-        print(f"[LOG] Result ({duration:.2f}s): {len(results)} regions.")
-        return {"response": json.dumps(results)}
+        # Return both objects and the overall scene context
+        return {
+            "response": json.dumps(results),
+            "context": scene_context # e.g. "a vegetable market stall with various items"
+        }
         
     except Exception as e:
-        print(f"[RUNTIME ERROR] {e}")
         if device == "mps": torch.mps.empty_cache()
         return Response(content=str(e), status_code=500)
 

@@ -1,11 +1,11 @@
 /**
  * FILE: flutter_app/lib/services/vision_service.dart
- * VERSION: 73.0.0
- * PHASE: Phase 53.2 (Contract Resilience)
+ * VERSION: 74.0.0
+ * PHASE: Phase 56.0 (Contextual Handshake)
  * AUTHOR: SatyaSetu Neural Architect
  * FIX: 
- * 1. Build Fix: Restored initialize() method to satisfy main.dart contract.
- * 2. Mission Control: Integrated record hooks for billion-user telemetry.
+ * 1. Data Parsing: Now captures the 'context' field from the Python server.
+ * 2. Reasoning Link: Passes the sceneContext to IntentEngine.resolve with 3 arguments.
  */
 
 import 'dart:async';
@@ -13,7 +13,6 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 import 'dart:ui' as ui;
-import 'package:camera/camera.dart';
 import 'package:camera_macos/camera_macos.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -43,11 +42,11 @@ class VisionService {
   bool _isRunning = false;
   bool _busy = false; 
   List<DetectionCandidate> _activeRegistry = [];
+  String _lastSceneContext = "Unknown environment";
   
   final _candidatesController = StreamController<List<DetectionCandidate>>.broadcast();
   Stream<List<DetectionCandidate>> get candidatesStream => _candidatesController.stream;
 
-  /// FIX: Restored to resolve "method not found" build error.
   Future<void> initialize() async {
     debugPrint("flutter: SATYA_DEBUG: [VISION] Silicon Ready.");
   }
@@ -76,17 +75,22 @@ class VisionService {
       final CameraMacOSFile? rawData = await macController!.takePicture();
       if (rawData?.bytes == null) { _busy = false; return; }
       
-      final rawResults = await _queryLocalEngine(rawData!.bytes!);
+      // 1. Fetch Perception and Context from Python Server
+      final Map<String, dynamic> results = await _queryLocalEngine(rawData!.bytes!);
       
-      // MISSION CONTROL: Pulse the telemetry ledger
+      final List<DetectionCandidate> rawResults = results['candidates'];
+      _lastSceneContext = results['sceneContext'];
+      
       MissionControlService().record(MetricType.detectionCount, rawResults.length.toDouble());
       
+      // 2. Update local state
       _activeRegistry = rawResults;
       _candidatesController.add(_activeRegistry);
       
+      // 3. Trigger individual reasoning pulses
       final List<String> allLabels = rawResults.map((e) => e.objectLabel).toList();
       for (var candidate in rawResults) {
-        _triggerReasoning(candidate, allLabels);
+        _triggerReasoning(candidate, _lastSceneContext, allLabels);
       }
     } catch (e) {
       MissionControlService().record(MetricType.errorRate, 1.0, metadata: e.toString());
@@ -97,13 +101,13 @@ class VisionService {
     }
   }
 
-  Future<void> _triggerReasoning(DetectionCandidate c, List<String> context) async {
-    c.situation = await IntentEngine.resolve(c.objectLabel, context);
-    // Broadcast updated registry with reasoning data
+  Future<void> _triggerReasoning(DetectionCandidate c, String scene, List<String> objects) async {
+    // FIX: Corrected call signature to 3 arguments as per IntentEngine v2.5.0
+    c.situation = await IntentEngine.resolve(c.objectLabel, scene, objects);
     _candidatesController.add(_activeRegistry); 
   }
 
-  Future<List<DetectionCandidate>> _queryLocalEngine(Uint8List imageBytes) async {
+  Future<Map<String, dynamic>> _queryLocalEngine(Uint8List imageBytes) async {
     const url = "http://127.0.0.1:8000/v1/vision"; 
     try {
       final response = await http.post(
@@ -114,12 +118,13 @@ class VisionService {
       
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        return _parseRaw(data['response'] ?? "[]");
+        return {
+          'candidates': _parseRaw(data['response'] ?? "[]"),
+          'sceneContext': data['context'] ?? "General environment"
+        };
       }
-    } catch (e) {
-      debugPrint("flutter: SATYA_DEBUG: [VISION] Bridge Offline.");
-    }
-    return [];
+    } catch (e) { debugPrint("flutter: SATYA_DEBUG: [VISION] Server connection lost."); }
+    return {'candidates': <DetectionCandidate>[], 'sceneContext': "Unknown"};
   }
 
   List<DetectionCandidate> _parseRaw(String text) {
@@ -131,7 +136,7 @@ class VisionService {
         id: "${label}_${box[0]}",
         objectLabel: label,
         relativeLocation: Rect.fromLTRB(box[0]/1000, box[1]/1000, box[2]/1000, box[3]/1000),
-        isLiving: label.contains("MAN") || label.contains("PERSON") || label.contains("BOY") || label.contains("WOMAN") || label.contains("GIRL") || label.contains("BABY") || label.contains("CHILD") || label.contains("ADULT"),
+        isLiving: label.contains("MAN") || label.contains("PERSON") || label.contains("BOY"),
       );
     }).toList();
   }
