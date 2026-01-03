@@ -1,11 +1,9 @@
 /**
  * FILE: flutter_app/lib/services/vision_service.dart
- * VERSION: 74.0.0
- * PHASE: Phase 56.0 (Contextual Handshake)
+ * VERSION: 75.0.0
+ * PHASE: Phase 56.3 (Heuristic Context Sync)
  * AUTHOR: SatyaSetu Neural Architect
- * FIX: 
- * 1. Data Parsing: Now captures the 'context' field from the Python server.
- * 2. Reasoning Link: Passes the sceneContext to IntentEngine.resolve with 3 arguments.
+ * FIX: Captures scene context from server and passes it to the reasoning engine.
  */
 
 import 'dart:async';
@@ -42,13 +40,12 @@ class VisionService {
   bool _isRunning = false;
   bool _busy = false; 
   List<DetectionCandidate> _activeRegistry = [];
-  String _lastSceneContext = "Unknown environment";
   
   final _candidatesController = StreamController<List<DetectionCandidate>>.broadcast();
   Stream<List<DetectionCandidate>> get candidatesStream => _candidatesController.stream;
 
   Future<void> initialize() async {
-    debugPrint("flutter: SATYA_DEBUG: [VISION] Silicon Ready.");
+    debugPrint("flutter: SATYA_DEBUG: [VISION] Contextual Engine Ready.");
   }
 
   void attachCamera(CameraMacOSController controller) {
@@ -75,22 +72,18 @@ class VisionService {
       final CameraMacOSFile? rawData = await macController!.takePicture();
       if (rawData?.bytes == null) { _busy = false; return; }
       
-      // 1. Fetch Perception and Context from Python Server
+      // 1. Fetch Detections and Scene Caption from server
       final Map<String, dynamic> results = await _queryLocalEngine(rawData!.bytes!);
       
       final List<DetectionCandidate> rawResults = results['candidates'];
-      _lastSceneContext = results['sceneContext'];
+      final String sceneContext = results['sceneContext'];
       
-      MissionControlService().record(MetricType.detectionCount, rawResults.length.toDouble());
-      
-      // 2. Update local state
       _activeRegistry = rawResults;
       _candidatesController.add(_activeRegistry);
       
-      // 3. Trigger individual reasoning pulses
       final List<String> allLabels = rawResults.map((e) => e.objectLabel).toList();
       for (var candidate in rawResults) {
-        _triggerReasoning(candidate, _lastSceneContext, allLabels);
+        _triggerReasoning(candidate, sceneContext, allLabels);
       }
     } catch (e) {
       MissionControlService().record(MetricType.errorRate, 1.0, metadata: e.toString());
@@ -102,7 +95,7 @@ class VisionService {
   }
 
   Future<void> _triggerReasoning(DetectionCandidate c, String scene, List<String> objects) async {
-    // FIX: Corrected call signature to 3 arguments as per IntentEngine v2.5.0
+    // Passes context detected by Florence to determine the schema
     c.situation = await IntentEngine.resolve(c.objectLabel, scene, objects);
     _candidatesController.add(_activeRegistry); 
   }
@@ -120,11 +113,11 @@ class VisionService {
         final data = jsonDecode(response.body);
         return {
           'candidates': _parseRaw(data['response'] ?? "[]"),
-          'sceneContext': data['context'] ?? "General environment"
+          'sceneContext': data['context'] ?? "general room"
         };
       }
-    } catch (e) { debugPrint("flutter: SATYA_DEBUG: [VISION] Server connection lost."); }
-    return {'candidates': <DetectionCandidate>[], 'sceneContext': "Unknown"};
+    } catch (e) {}
+    return {'candidates': <DetectionCandidate>[], 'sceneContext': ""};
   }
 
   List<DetectionCandidate> _parseRaw(String text) {

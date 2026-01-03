@@ -1,8 +1,7 @@
 # FILE: apple_vision_server.py
-# PURPOSE: SatyaSetu "Contextual Eye" Engine.
-# VERSION: 8.7.0 (Contextual Awareness Release)
+# VERSION: 8.8.0 (Scene Awareness Release)
 # DESCRIPTION: Adds Global Scene Captioning to provide environment context 
-# to the Intent Engine without needing Gemini API calls for every object.
+# without needing Gemini API calls for every object.
 
 import uvicorn
 from fastapi import FastAPI, Request, Response
@@ -35,15 +34,13 @@ model, processor, device = initialize_brain()
 
 @app.post('/v1/vision')
 async def vision(request: Request):
-    start_time = time.time()
     try:
         payload = await request.json()
         img_data = base64.b64decode(payload['images'][0])
         image = Image.open(io.BytesIO(img_data)).convert("RGB")
         
-        # --- TASK 1: DENSE REGION CAPTION (The Objects) ---
+        # TASK 1: OBJECTS | TASK 2: ENVIRONMENT
         dense_prompt = "<DENSE_REGION_CAPTION>"
-        # --- TASK 2: DETAILED CAPTION (The Environment) ---
         scene_prompt = "<DETAILED_CAPTION>"
         
         results = []
@@ -56,7 +53,7 @@ async def vision(request: Request):
             response_text = processor.batch_decode(generated_ids, skip_special_tokens=False)[0]
             prediction = processor.post_process_generation(response_text, task=dense_prompt, image_size=(image.width, image.height))
             
-            # 2. Context Pulse (Understand the environment locally)
+            # 2. Context Pulse (Understand the environment locally via Florence-2)
             scene_inputs = processor(text=scene_prompt, images=image, return_tensors="pt").to(device)
             scene_ids = model.generate(input_ids=scene_inputs["input_ids"], pixel_values=scene_inputs["pixel_values"], max_new_tokens=32)
             scene_context = processor.batch_decode(scene_ids, skip_special_tokens=True)[0]
@@ -74,10 +71,9 @@ async def vision(request: Request):
         torch.mps.empty_cache()
         gc.collect()
 
-        # Return both objects and the overall scene context
         return {
             "response": json.dumps(results),
-            "context": scene_context # e.g. "a vegetable market stall with various items"
+            "context": scene_context # Passes locally detected environment context to Dart
         }
         
     except Exception as e:
