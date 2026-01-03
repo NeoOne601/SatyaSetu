@@ -1,10 +1,10 @@
 /**
  * FILE: flutter_app/lib/services/intent_harvester.dart
- * VERSION: 2.0.0
- * PHASE: Phase 52.1 (Cryptographic Intent Ledger)
+ * VERSION: 2.1.0
+ * PHASE: Phase 54.0 (Signature Resilience)
  * AUTHOR: SatyaSetu Neural Architect
- * DESCRIPTION: Harvests interactions and signs them with the user's DID 
- * from the Identity Repository. Implements the "Physical Knowledge Graph" anchor.
+ * FIX: Added try-catch guard for the Rust bridge to prevent UPI validation 
+ * crashes during generic physical interactions (Mandi/Education).
  */
 
 import 'dart:convert';
@@ -18,7 +18,7 @@ class IntentPulse {
   final String actionLabel;
   final String signerDID;
   final String signature;
-  final int satyaTrustScore; // 1-10 rating of the AI's helpfulness
+  final int satyaTrustScore;
   final DateTime timestamp;
 
   IntentPulse({
@@ -45,7 +45,6 @@ class IntentPulse {
 class IntentHarvester {
   static final List<IntentPulse> _harvestBuffer = [];
 
-  /// RECORDS AND SIGNS: The physical interaction pulse.
   static Future<void> harvest(
     IdentityRepository repo, 
     String label, 
@@ -53,31 +52,36 @@ class IntentHarvester {
     String actionLabel, 
     int score
   ) async {
-    // 1. Obtain current identity
     final identities = await repo.getIdentities();
     if (identities.isEmpty) return;
     final did = identities.first.id;
 
-    // 2. Prepare Payload for signing
     final payload = "$label|$actionLabel|${DateTime.now().toIso8601String()}";
-    
-    // 3. Cryptographically Sign the Intent (using our Rust Core)
-    final signature = await repo.signIntent(did, payload);
+    String finalSignature = "unsigned_intent_metadata";
+
+    try {
+      // ATTEMPT CRYPTOGRAPHIC SIGNING
+      // Note: Rust core currently validates for 'upi://' prefix. 
+      // If validation fails, we catch the exception to keep the app running.
+      finalSignature = await repo.signIntent(did, payload);
+    } catch (e) {
+      debugPrint("flutter: SATYA_DEBUG: [HARVESTER] Signature skipped (Non-UPI data): $e");
+      // Fallback: Generate a deterministic hash for tracking without crashing
+      finalSignature = "H-INTENT-${payload.hashCode}";
+    }
 
     final pulse = IntentPulse(
       label: label,
       context: context,
       actionLabel: actionLabel,
       signerDID: did,
-      signature: signature,
+      signature: finalSignature,
       satyaTrustScore: score,
       timestamp: DateTime.now(),
     );
 
     _harvestBuffer.add(pulse);
-    
-    // MISSION CONTROL: Log the signed pulse for indexing
-    debugPrint("flutter: SATYA_DEBUG: [LEDGER] Signed Pulse Recorded: ${jsonEncode(pulse.toJson())}");
+    debugPrint("flutter: SATYA_DEBUG: [LEDGER] Pulse Harvested: ${jsonEncode(pulse.toJson())}");
   }
 
   static List<IntentPulse> get pulses => List.unmodifiable(_harvestBuffer);
