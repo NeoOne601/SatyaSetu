@@ -1,10 +1,12 @@
 /**
  * FILE: flutter_app/lib/services/intent_engine.dart
- * VERSION: 2.7.0
- * PHASE: Phase 57.0 (General Intelligence Loop)
+ * VERSION: 3.0.0
+ * PHASE: Phase 61.2 (Tri-Card General Intelligence)
  * AUTHOR: SatyaSetu Neural Architect
- * DESCRIPTION: Handles both local heuristic schemas and deep cloud reasoning.
- * Implements the "Ask Mentor" logic to provide actual answers to user questions.
+ * DESCRIPTION:
+ * 1. resolveInstant: 2 cards provided by local Florence (No Lag).
+ * 2. fetchInquiries: 1 card provided by local Gemma (Background).
+ * 3. Distinct Coloration: Deterministic neon hashing for every label.
  */
 
 import 'dart:convert';
@@ -14,72 +16,56 @@ import 'package:lucide_icons/lucide_icons.dart';
 import '../models/intent_models.dart';
 
 class IntentEngine {
-  static const String _apiEndpoint = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent";
-  static const String _apiKey = ""; // Injected by env
-
-  /// DYNAMIC SCHEMER: Decides what actions to show for any object.
-  static Future<SituationState> resolve(String label, String sceneContext, List<String> objects) async {
-    final String l = label.toUpperCase();
-    final Color dynamicColor = _generateVibrantColor(l);
-
-    // Instead of hardcoding, we use 'Scene Context' from Florence to guess the schema
-    String title = "Object Identified";
-    List<Map<String, String>> actions = [
-      {"label": "Ask Mentor", "type": "input", "desc": "Question about $label"},
-      {"label": "Quick Audit", "type": "rate", "desc": "Log $label state"}
-    ];
-
-    if (sceneContext.contains("market") || sceneContext.contains("shop")) {
-      title = "Commercial Context";
-      actions.add({"label": "Price Index", "type": "input", "desc": "Log local rate"});
-    } else if (sceneContext.contains("kitchen") || sceneContext.contains("cooking")) {
-      title = "Domestic Context";
-      actions.add({"label": "Nutrition", "type": "info", "desc": "Check health data"});
-    }
-
-    return _buildMorphicState(title, dynamicColor, actions);
-  }
-
-  /// THE BRAIN PULSE: Actually answers the "Ask Mentor" question.
-  static Future<String> askMentor(String object, String question, String context) async {
-    try {
-      final prompt = "You are SatyaSetu Mentor. User is looking at '$object' in a '$context'. They ask: '$question'. Provide a concise, intelligent answer (max 2 sentences).";
-      
-      final response = await http.post(
-        Uri.parse("$_apiEndpoint?key=$_apiKey"),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          "contents": [{"parts": [{"text": prompt}]}],
-        })
-      ).timeout(const Duration(seconds: 8));
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        return data['candidates'][0]['content']['parts'][0]['text'];
-      }
-    } catch (e) {
-      return "Mentor link stuttered. Please try again.";
-    }
-    return "Searching knowledge graph...";
-  }
-
-  static SituationState _buildMorphicState(String title, Color color, List<Map<String, String>> actions) {
+  /// INSTANT PERCEPTION: Generates the first 2 cards immediately from Florence detection.
+  static SituationState resolveInstant(String label, String sceneContext) {
+    final Color dynamicColor = generateVibrantColor(label);
+    
     return SituationState(
-      title: title,
+      title: "Physical Perception",
       context: SituationContext.global,
-      themeColor: color,
-      actions: actions.map((a) => MorphicAction(
-        label: a['label']!,
-        icon: a['type'] == "input" ? LucideIcons.messageSquare : (a['type'] == "rate" ? LucideIcons.star : LucideIcons.info),
-        description: a['desc']!,
-        payloadType: a['type']!,
-        onExecute: (c) => {},
-      )).toList(),
+      themeColor: dynamicColor,
+      actions: [
+        MorphicAction(
+          label: "Visual Ground Truth", 
+          icon: LucideIcons.eye, 
+          description: "Florence confirm: $label",
+          payloadType: "info",
+          onExecute: (c) => {}
+        ),
+        MorphicAction(
+          label: "Environmental Logic", 
+          icon: LucideIcons.packageSearch, 
+          description: "Object role in $sceneContext",
+          payloadType: "info",
+          onExecute: (c) => {}
+        ),
+      ],
     );
   }
 
-  static Color _generateVibrantColor(String text) {
+  /// COGNITIVE INQUIRY: Fetches relatable questions from the local Gemma brain.
+  static Future<List<String>> fetchInquiries(String label, String sceneContext) async {
+    try {
+      final response = await http.post(
+        Uri.parse("http://127.0.0.1:8000/v1/reason"),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({"object": label, "context": sceneContext})
+      ).timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return List<String>.from(data['questions']);
+      }
+    } catch (e) {
+      debugPrint("flutter: SATYA_DEBUG: [REASONER] Gemma logic stutter.");
+    }
+    return ["Synthesizing $label insights..."];
+  }
+
+  /// DETERMINISTIC VIBRANT COLORATION: Ensures distinct boxes on the fly.
+  static Color generateVibrantColor(String text) {
     final int hash = text.hashCode;
-    return HSVColor.fromAHSV(1.0, (hash % 360).toDouble(), 0.8, 0.9).toColor();
+    // Maps label string to a consistent, bright neon hue
+    return HSVColor.fromAHSV(1.0, (hash % 360).toDouble(), 0.8, 0.95).toColor();
   }
 }

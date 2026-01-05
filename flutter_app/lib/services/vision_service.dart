@@ -1,22 +1,22 @@
 /**
  * FILE: flutter_app/lib/services/vision_service.dart
- * VERSION: 75.0.0
- * PHASE: Phase 56.3 (Heuristic Context Sync)
+ * VERSION: 77.0.0
+ * PHASE: Phase 61.1 (Null-Safe Retina)
  * AUTHOR: SatyaSetu Neural Architect
- * FIX: Captures scene context from server and passes it to the reasoning engine.
+ * FIX: 
+ * 1. Build Fix: Implemented null-safe byte extraction to prevent crash.
+ * 2. Scene Context: Exposes the Florence-detected environment to the UI.
  */
 
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
-import 'dart:ui' as ui;
 import 'package:camera_macos/camera_macos.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../models/intent_models.dart';
 import '../models/telemetry_models.dart';
-import 'intent_engine.dart';
 import 'mission_control_service.dart';
 
 class DetectionCandidate {
@@ -24,14 +24,12 @@ class DetectionCandidate {
   final String objectLabel;
   final Rect relativeLocation; 
   final bool isLiving;
-  SituationState? situation; 
   
   DetectionCandidate({
     required this.id,
     required this.objectLabel, 
     required this.relativeLocation,
     required this.isLiving,
-    this.situation,
   });
 }
 
@@ -40,12 +38,13 @@ class VisionService {
   bool _isRunning = false;
   bool _busy = false; 
   List<DetectionCandidate> _activeRegistry = [];
+  String currentScene = "General environment";
   
   final _candidatesController = StreamController<List<DetectionCandidate>>.broadcast();
   Stream<List<DetectionCandidate>> get candidatesStream => _candidatesController.stream;
 
   Future<void> initialize() async {
-    debugPrint("flutter: SATYA_DEBUG: [VISION] Contextual Engine Ready.");
+    debugPrint("flutter: SATYA_DEBUG: [VISION] Neural Retina Ready.");
   }
 
   void attachCamera(CameraMacOSController controller) {
@@ -64,26 +63,30 @@ class VisionService {
   }
 
   Future<void> _performRealWorldAnalysis() async {
-    if (_busy) return;
+    if (_busy || macController == null) return;
     _busy = true;
     final stopwatch = Stopwatch()..start();
     
     try {
       final CameraMacOSFile? rawData = await macController!.takePicture();
-      if (rawData?.bytes == null) { _busy = false; return; }
+      // FIX: Robust Null-Safe extraction for bytes
+      final bytes = rawData?.bytes;
+      if (bytes == null) { _busy = false; return; }
       
-      // 1. Fetch Detections and Scene Caption from server
-      final Map<String, dynamic> results = await _queryLocalEngine(rawData!.bytes!);
+      const url = "http://127.0.0.1:8000/v1/vision"; 
+      final response = await http.post(
+        Uri.parse(url),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({"images": [base64Encode(bytes)]})
+      ).timeout(const Duration(seconds: 15));
       
-      final List<DetectionCandidate> rawResults = results['candidates'];
-      final String sceneContext = results['sceneContext'];
-      
-      _activeRegistry = rawResults;
-      _candidatesController.add(_activeRegistry);
-      
-      final List<String> allLabels = rawResults.map((e) => e.objectLabel).toList();
-      for (var candidate in rawResults) {
-        _triggerReasoning(candidate, sceneContext, allLabels);
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        currentScene = data['context'] ?? "General environment";
+        _activeRegistry = _parseRaw(data['response'] ?? "[]");
+        _candidatesController.add(_activeRegistry);
+        
+        MissionControlService().record(MetricType.detectionCount, _activeRegistry.length.toDouble());
       }
     } catch (e) {
       MissionControlService().record(MetricType.errorRate, 1.0, metadata: e.toString());
@@ -92,32 +95,6 @@ class VisionService {
       MissionControlService().record(MetricType.latency, stopwatch.elapsedMilliseconds / 1000.0);
       _busy = false; 
     }
-  }
-
-  Future<void> _triggerReasoning(DetectionCandidate c, String scene, List<String> objects) async {
-    // Passes context detected by Florence to determine the schema
-    c.situation = await IntentEngine.resolve(c.objectLabel, scene, objects);
-    _candidatesController.add(_activeRegistry); 
-  }
-
-  Future<Map<String, dynamic>> _queryLocalEngine(Uint8List imageBytes) async {
-    const url = "http://127.0.0.1:8000/v1/vision"; 
-    try {
-      final response = await http.post(
-        Uri.parse(url),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({"images": [base64Encode(imageBytes)]})
-      ).timeout(const Duration(seconds: 15));
-      
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        return {
-          'candidates': _parseRaw(data['response'] ?? "[]"),
-          'sceneContext': data['context'] ?? "general room"
-        };
-      }
-    } catch (e) {}
-    return {'candidates': <DetectionCandidate>[], 'sceneContext': ""};
   }
 
   List<DetectionCandidate> _parseRaw(String text) {
@@ -129,7 +106,7 @@ class VisionService {
         id: "${label}_${box[0]}",
         objectLabel: label,
         relativeLocation: Rect.fromLTRB(box[0]/1000, box[1]/1000, box[2]/1000, box[3]/1000),
-        isLiving: label.contains("MAN") || label.contains("PERSON") || label.contains("BOY"),
+        isLiving: label.contains("MAN") || label.contains("PERSON"),
       );
     }).toList();
   }

@@ -1,14 +1,12 @@
 /**
  * FILE: flutter_app/lib/services/mission_control_service.dart
- * VERSION: 1.0.0
- * PHASE: Phase 51.1 (Observability Pipeline)
+ * VERSION: 1.2.0
+ * PHASE: Phase 61.0 (Synchronous Observability)
  * AUTHOR: SatyaSetu Mission Systems
- * DESCRIPTION: Handles high-volume telemetry gathering. Implements a 
- * circular buffer to prevent memory bloat at billion-user scale.
+ * FIX: Added synchronous 'totalDetections' getter to resolve UI build error.
  */
 
 import 'dart:async';
-import 'package:flutter/foundation.dart';
 import '../models/telemetry_models.dart';
 
 class MissionControlService {
@@ -18,11 +16,18 @@ class MissionControlService {
 
   final List<SystemPulse> _pulseBuffer = [];
   final _statsStreamController = StreamController<SystemHealth>.broadcast();
+  
+  // FIX: Explicit tracking for synchronous UI status checks
+  int _detectionCount = 0;
+  int get totalDetections => _detectionCount;
 
   Stream<SystemHealth> get statsStream => _statsStreamController.stream;
 
-  /// Records a telemetry event (The "Black Box" recorder)
   void record(MetricType type, double value, {String metadata = ""}) {
+    if (type == MetricType.detectionCount) {
+      _detectionCount += value.toInt();
+    }
+
     final pulse = SystemPulse(
       timestamp: DateTime.now(),
       value: value,
@@ -31,18 +36,14 @@ class MissionControlService {
     );
 
     _pulseBuffer.add(pulse);
-    
-    // SCALE GUARD: Maintain only the last 500 pulses in memory (Circular Buffer)
-    if (_pulseBuffer.length > 500) {
-      _pulseBuffer.removeAt(0);
-    }
+    if (_pulseBuffer.length > 500) _pulseBuffer.removeAt(0);
 
     _calculateAndEmit();
   }
 
   void _calculateAndEmit() {
     if (_pulseBuffer.isEmpty) return;
-
+    
     final latencies = _pulseBuffer.where((p) => p.type == MetricType.latency);
     final errors = _pulseBuffer.where((p) => p.type == MetricType.errorRate);
     
@@ -52,9 +53,9 @@ class MissionControlService {
 
     _statsStreamController.add(SystemHealth(
       averageLatency: avgLat,
-      totalDetections: _pulseBuffer.where((p) => p.type == MetricType.detectionCount).length,
+      totalDetections: _detectionCount,
       errorPercentage: errors.length / _pulseBuffer.length * 100,
-      topIntents: {}, // Future: Aggregate from metadata
+      topIntents: {},
     ));
   }
 }
