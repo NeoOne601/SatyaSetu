@@ -1,12 +1,11 @@
 /**
  * FILE: flutter_app/lib/main.dart
- * VERSION: 44.0.0
- * PHASE: Phase 61.3 (Inquiry UI Integration)
+ * VERSION: 58.0.0
  * AUTHOR: SatyaSetu Neural Architect
  * FIX:
- * 1. Resolved build error with getter 'totalDetections'.
- * 2. Implemented Tri-Card UI: 2 instant Florence cards + 1 async Gemma card.
- * 3. Frictionless: Removed all feedback dialogs.
+ * 1. Resolved Rendering: BoxConstraints + SingleChildScrollView for BottomSheet.
+ * 2. 2+3 Interaction: Tier 1 (Florence) instant actions, Tier 2 (Gemma) inquiries.
+ * 3. Memory Integrity: UI remains responsive during background synthesis.
  */
 
 import 'dart:io';
@@ -28,8 +27,11 @@ import 'models/telemetry_models.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  final repo = IdentityRepository();
-  runApp(SatyaApp(vaultService: VaultService(repo), repo: repo, visionService: VisionService()));
+  runApp(SatyaApp(
+    vaultService: VaultService(IdentityRepository()), 
+    repo: IdentityRepository(), 
+    visionService: VisionService()
+  ));
 }
 
 class SatyaApp extends StatelessWidget {
@@ -67,7 +69,7 @@ class _UnlockScreenState extends State<UnlockScreen> {
   @override Widget build(BuildContext context) => Scaffold(body: Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
     const Icon(LucideIcons.shieldCheck, size: 80, color: Color(0xFF00FFC8)),
     const SizedBox(height: 32),
-    Container(width: 200, child: TextField(controller: _pinController, obscureText: true, textAlign: TextAlign.center, decoration: const InputDecoration(hintText: "PIN"), keyboardType: TextInputType.number, onChanged: (v) { if (v.length == 6) _attemptUnlock(); })),
+    SizedBox(width: 200, child: TextField(controller: _pinController, obscureText: true, textAlign: TextAlign.center, decoration: const InputDecoration(hintText: "PIN"), keyboardType: TextInputType.number, onChanged: (v) { if (v.length == 6) _attemptUnlock(); })),
   ])));
 }
 
@@ -89,65 +91,70 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _showIntentCard(DetectionCandidate candidate) {
-    // 1. GENERATE INSTANT CARDS (Florence-2 Power)
-    final instantState = IntentEngine.resolveInstant(candidate.objectLabel, widget.visionService.currentScene);
+    // 1. GENERATE INSTANT TIER 1 ACTIONS
+    final instantState = IntentEngine.resolveInstant(candidate.objectLabel);
     
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.black.withOpacity(0.95),
+      isScrollControlled: true, 
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(32))),
-      builder: (c) => Container(
-        padding: const EdgeInsets.all(32.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2))),
-            const SizedBox(height: 16),
-            Text(candidate.objectLabel, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
-            const Divider(height: 30, color: Colors.white10),
-            
-            // THE 2 INSTANT CARDS (Florence)
-            ...instantState.actions.map((a) => ListTile(
-              leading: Icon(a.icon, color: instantState.themeColor),
-              title: Text(a.label, style: const TextStyle(fontWeight: FontWeight.bold)),
-              subtitle: Text(a.description, style: const TextStyle(fontSize: 10, color: Colors.white54)),
-            )),
-            
-            const SizedBox(height: 16),
-            const Row(children: [Icon(LucideIcons.helpCircle, size: 14, color: Colors.blueAccent), SizedBox(width: 8), Text("RELATABLE INQUIRIES", style: TextStyle(fontSize: 10, letterSpacing: 1, fontWeight: FontWeight.bold, color: Colors.blueAccent))]),
-            const SizedBox(height: 8),
+      builder: (c) => Padding(
+        padding: EdgeInsets.only(bottom: MediaQuery.of(c).viewInsets.bottom),
+        child: Container(
+          constraints: BoxConstraints(maxHeight: MediaQuery.of(c).size.height * 0.75),
+          padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2))),
+                const SizedBox(height: 16),
+                Text(candidate.objectLabel, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
+                const Divider(height: 32, color: Colors.white10),
+                
+                // Florence Choices: Immediate
+                ...instantState.actions.map((a) => ListTile(
+                  dense: true,
+                  leading: Icon(a.icon, color: instantState.themeColor, size: 20),
+                  title: Text(a.label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                  subtitle: Text(a.description, style: const TextStyle(fontSize: 10, color: Colors.white54)),
+                  onTap: () { Navigator.pop(c); _harvestInteraction(candidate, a.label); },
+                )),
+                
+                const SizedBox(height: 16),
+                const Row(children: [Icon(LucideIcons.brainCircuit, size: 14, color: Colors.blueAccent), SizedBox(width: 8), Text("GEMMA INQUIRIES (TIER 2)", style: TextStyle(fontSize: 9, letterSpacing: 1, fontWeight: FontWeight.bold, color: Colors.blueAccent))]),
+                const SizedBox(height: 12),
 
-            // THE 3RD DYNAMIC CARD (Gemma Relatable Questions)
-            Container(
-              decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(16)),
-              child: FutureBuilder<List<String>>(
-                future: IntentEngine.fetchInquiries(candidate.objectLabel, widget.visionService.currentScene),
-                builder: (context, snapshot) {
-                  if (!snapshot.hasData) return const ListTile(title: Text("Reasoning locally...", style: TextStyle(fontSize: 12, color: Colors.white38)));
-                  return Column(
-                    children: snapshot.data!.map((q) => ListTile(
-                      dense: true,
-                      title: Text(q, style: const TextStyle(fontSize: 12)),
-                      trailing: const Icon(LucideIcons.chevronRight, size: 12),
-                      onTap: () {
-                        Navigator.pop(c);
-                        _harvestDirect(candidate, q);
-                      },
-                    )).toList(),
-                  );
-                },
-              ),
+                // Gemma Choices: Asynchronous
+                Container(
+                  decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(16)),
+                  child: FutureBuilder<List<String>>(
+                    future: IntentEngine.fetchInquiries(candidate.objectLabel, widget.visionService.currentScene),
+                    builder: (context, snapshot) {
+                      if (!snapshot.hasData) return const ListTile(title: Text("Analyzing relatable insights...", style: TextStyle(fontSize: 12, color: Colors.white38)));
+                      return Column(
+                        children: snapshot.data!.map((q) => ListTile(
+                          dense: true,
+                          title: Text(q, style: const TextStyle(fontSize: 12)),
+                          trailing: const Icon(LucideIcons.zap, size: 12, color: Colors.blueAccent),
+                          onTap: () { Navigator.pop(c); _harvestInteraction(candidate, q); },
+                        )).toList(),
+                      );
+                    },
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
   }
 
-  void _harvestDirect(DetectionCandidate c, String inquiry) async {
-    // Frictionless: Zero feedback required. Direct log to ledger.
-    await IntentHarvester.harvest(widget.repo, c.objectLabel, SituationContext.global, "User Inquired: $inquiry", 10);
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Interaction Indexed to DID Ledger"), backgroundColor: Color(0xFF00FFC8)));
+  void _harvestInteraction(DetectionCandidate c, String interaction) async {
+    await IntentHarvester.harvest(widget.repo, c.objectLabel, SituationContext.global, "User Chose: $interaction", 10);
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Interaction Pulse Logged"), backgroundColor: Color(0xFF00FFC8), duration: Duration(milliseconds: 800)));
   }
 
   @override Widget build(BuildContext context) {
@@ -159,7 +166,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ..._candidates.map((c) => _buildMorphicTile(c, constraints.maxWidth, constraints.maxHeight)),
           Positioned(top: 60, left: 24, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             const Text("SATYA SETU", style: TextStyle(letterSpacing: 4, fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF00FFC8))),
-            Text(MissionControlService().totalDetections > 0 ? "AUTONOMOUS CORE ACTIVE" : "SYNCHRONIZING RETINA...", style: const TextStyle(fontSize: 8, color: Colors.white38)),
+            Text(MissionControlService().totalDetections > 0 ? "LOCAL AGENT ACTIVE" : "SYNCHRONIZING...", style: const TextStyle(fontSize: 8, color: Colors.white38)),
           ])),
         ]);
       }),
@@ -170,8 +177,8 @@ class _HomeScreenState extends State<HomeScreen> {
     final Color baseColor = IntentEngine.generateVibrantColor(c.objectLabel);
     return AnimatedPositioned(
       duration: const Duration(milliseconds: 300),
-      left: c.relativeLocation.left * screenW,
-      top: c.relativeLocation.top * screenH,
+      left: (c.relativeLocation.left * screenW).clamp(0, screenW - 50),
+      top: (c.relativeLocation.top * screenH).clamp(0, screenH - 50),
       width: (c.relativeLocation.width * screenW).clamp(45.0, screenW),
       height: (c.relativeLocation.height * screenH).clamp(35.0, screenH),
       child: GestureDetector(

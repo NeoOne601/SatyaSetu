@@ -1,11 +1,10 @@
 /**
  * FILE: flutter_app/lib/services/vision_service.dart
- * VERSION: 77.0.0
- * PHASE: Phase 61.1 (Null-Safe Retina)
+ * VERSION: 81.0.0
+ * PHASE: Phase 69.1 (Reactive Pulse Heartbeat)
  * AUTHOR: SatyaSetu Neural Architect
- * FIX: 
- * 1. Build Fix: Implemented null-safe byte extraction to prevent crash.
- * 2. Scene Context: Exposes the Florence-detected environment to the UI.
+ * FIX: Replaced Timer-based loop with a Sequential Request-Response cycle.
+ * This prevents memory ballooning by ensuring only one request is in-flight.
  */
 
 import 'dart:async';
@@ -24,76 +23,64 @@ class DetectionCandidate {
   final String objectLabel;
   final Rect relativeLocation; 
   final bool isLiving;
-  
-  DetectionCandidate({
-    required this.id,
-    required this.objectLabel, 
-    required this.relativeLocation,
-    required this.isLiving,
-  });
+  DetectionCandidate({required this.id, required this.objectLabel, required this.relativeLocation, required this.isLiving});
 }
 
 class VisionService {
   CameraMacOSController? macController; 
   bool _isRunning = false;
-  bool _busy = false; 
   List<DetectionCandidate> _activeRegistry = [];
-  String currentScene = "General environment";
+  String currentScene = "General";
   
   final _candidatesController = StreamController<List<DetectionCandidate>>.broadcast();
   Stream<List<DetectionCandidate>> get candidatesStream => _candidatesController.stream;
 
   Future<void> initialize() async {
-    debugPrint("flutter: SATYA_DEBUG: [VISION] Neural Retina Ready.");
+    debugPrint("flutter: SATYA_DEBUG: [VISION] Reactive Protocol Ready.");
   }
 
   void attachCamera(CameraMacOSController controller) {
     macController = controller;
     _isRunning = true;
-    _runNeuralLoop();
+    _startSequentialPulse();
   }
 
-  Future<void> _runNeuralLoop() async {
+  /// SEQUENTIAL PULSE: Send, Wait, then Schedule Next. 
+  /// Prevents memory leaks and request flooding.
+  Future<void> _startSequentialPulse() async {
     while (_isRunning) {
-      if (!_busy && macController != null) {
-        await _performRealWorldAnalysis();
+      if (macController != null) {
+        await _performOnePulse();
       }
-      await Future.delayed(const Duration(milliseconds: 2200));
+      // Brief pause to allow UI thread to breathe
+      await Future.delayed(const Duration(milliseconds: 300));
     }
   }
 
-  Future<void> _performRealWorldAnalysis() async {
-    if (_busy || macController == null) return;
-    _busy = true;
+  Future<void> _performOnePulse() async {
     final stopwatch = Stopwatch()..start();
-    
     try {
       final CameraMacOSFile? rawData = await macController!.takePicture();
-      // FIX: Robust Null-Safe extraction for bytes
-      final bytes = rawData?.bytes;
-      if (bytes == null) { _busy = false; return; }
+      if (rawData?.bytes == null) return;
       
       const url = "http://127.0.0.1:8000/v1/vision"; 
       final response = await http.post(
         Uri.parse(url),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({"images": [base64Encode(bytes)]})
+        body: jsonEncode({"images": [base64Encode(rawData!.bytes!)]})
       ).timeout(const Duration(seconds: 15));
       
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        currentScene = data['context'] ?? "General environment";
         _activeRegistry = _parseRaw(data['response'] ?? "[]");
         _candidatesController.add(_activeRegistry);
         
+        final latency = stopwatch.elapsedMilliseconds;
+        debugPrint("flutter: SATYA_DEBUG: [PULSE] Latency: ${latency}ms | Count: ${_activeRegistry.length}");
         MissionControlService().record(MetricType.detectionCount, _activeRegistry.length.toDouble());
       }
     } catch (e) {
-      MissionControlService().record(MetricType.errorRate, 1.0, metadata: e.toString());
-    } finally {
-      stopwatch.stop();
-      MissionControlService().record(MetricType.latency, stopwatch.elapsedMilliseconds / 1000.0);
-      _busy = false; 
+      debugPrint("flutter: SATYA_DEBUG: [VISION] Heartbeat Stutter: $e");
     }
   }
 
