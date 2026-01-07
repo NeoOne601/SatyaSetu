@@ -1,15 +1,14 @@
 /**
  * FILE: flutter_app/lib/main.dart
- * VERSION: 66.0.0
- * PHASE: Phase 71.4 (APE Checklist UI Deployment)
+ * VERSION: 69.0.0
+ * PHASE: Phase 76.4 (Stability Protocol)
  * AUTHOR: SatyaSetu Principal Engineer
  * DESCRIPTION: 
- * 1. Replaced question cards with structured, recordable APE Action Chains.
- * 2. Implemented hardware state management (pausing vision for reasoning).
- * 3. Resolved overflow layouts to maintain absolute UI stability.
+ * 1. Hardware-Handover: Vision stream EXPLICITLY stops when a card is tapped.
+ * 2. Async Planning: Cards fetch APE plans only when opened.
+ * 3. Zero-Freeze UI: Separated eye (Florence) from brain (Gemma).
  */
 
-import 'dart:io';
 import 'dart:convert';
 import 'dart:async';
 import 'package:flutter/material.dart';
@@ -92,9 +91,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _showIntentCard(DetectionCandidate candidate) {
-    final instantState = IntentEngine.resolveInstant(candidate.objectLabel);
+    // 1. LOCK THE EYES: Free GPU memory for the brain
     widget.visionService.isPaused = true;
-    
+
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.black.withOpacity(0.95),
@@ -114,46 +113,31 @@ class _HomeScreenState extends State<HomeScreen> {
                 Text(candidate.objectLabel, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
                 const Divider(height: 32, color: Colors.white10),
                 
-                ...instantState.actions.map((a) => ListTile(
-                  dense: true,
-                  leading: Icon(a.icon, color: instantState.themeColor, size: 20),
-                  title: Text(a.label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                  subtitle: Text(a.description, style: const TextStyle(fontSize: 10, color: Colors.white54)),
-                  onTap: () { Navigator.pop(c); _harvest(candidate, "Perception: ${a.label}"); },
-                )),
-                
-                const SizedBox(height: 20),
                 const Row(children: [Icon(LucideIcons.listChecks, size: 14, color: Colors.blueAccent), SizedBox(width: 8), Text("AFFORDANCE ACTION CHAINS", style: TextStyle(fontSize: 9, letterSpacing: 1, fontWeight: FontWeight.bold, color: Colors.blueAccent))]),
-                const SizedBox(height: 12),
+                const SizedBox(height: 16),
 
+                // 2. FETCH PLAN ON DEMAND: High Stability Path
                 FutureBuilder<ApeResponse>(
-                  future: IntentEngine.fetchAffordances(candidate.objectLabel, "market"),
+                  future: IntentEngine.fetchAffordances(candidate.objectLabel, "general"),
                   builder: (context, snapshot) {
-                    if (!snapshot.hasData) return const ListTile(title: Text("Compiling plans...", style: TextStyle(fontSize: 12, color: Colors.white38)));
+                    if (!snapshot.hasData) return const ListTile(title: Text("Synthesizing actions...", style: TextStyle(fontSize: 12, color: Colors.white38)));
                     
-                    if (snapshot.data!.affordances.isEmpty) {
-                      return ListTile(
-                        title: const Text("Handshake delay. Try again.", style: TextStyle(fontSize: 12, color: Colors.redAccent)),
-                        trailing: IconButton(icon: const Icon(LucideIcons.refreshCcw, size: 16), onPressed: () => setState((){})),
-                      );
-                    }
-                    
+                    final plan = snapshot.data!;
+                    if (plan.affordances.isEmpty) return const ListTile(title: Text("No actions available.", style: TextStyle(fontSize: 12, color: Colors.white38)));
+
                     return Column(
-                      children: snapshot.data!.affordances.map((aff) => Container(
+                      children: plan.affordances.map((aff) => Container(
                         margin: const EdgeInsets.only(bottom: 12),
                         decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(16)),
                         child: ExpansionTile(
+                          initiallyExpanded: true,
                           title: Text(aff.name.toUpperCase(), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.blueAccent)),
-                          subtitle: Text("Certainty: ${(aff.confidence * 100).toInt()}%", style: const TextStyle(fontSize: 10, color: Colors.white38)),
                           children: aff.actions.map((act) => ListTile(
                             dense: true,
                             leading: CircleAvatar(radius: 10, backgroundColor: Colors.white10, child: Text("${act.step}", style: const TextStyle(fontSize: 9))),
                             title: Text(act.instruction, style: const TextStyle(fontSize: 11)),
                             trailing: act.recordable ? const Icon(LucideIcons.fingerprint, size: 14, color: Color(0xFF00FFC8)) : null,
-                            onTap: () {
-                              Navigator.pop(c);
-                              _harvest(candidate, "Plan: ${aff.name} step ${act.step}");
-                            },
+                            onTap: () { Navigator.pop(c); _harvest(candidate, "Step ${act.step}: ${act.instruction}"); },
                           )).toList(),
                         ),
                       )).toList(),
@@ -166,13 +150,14 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     ).whenComplete(() {
+      // 3. UNLOCK THE EYES: Resume real-time tracking
       widget.visionService.isPaused = false;
     });
   }
 
   void _harvest(DetectionCandidate c, String interaction) async {
-    await IntentHarvester.harvest(widget.repo, c.objectLabel, SituationContext.global, "APE Choice: $interaction", 10);
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Trust interaction committed to ledger."), backgroundColor: Color(0xFF00FFC8), duration: Duration(milliseconds: 800)));
+    await IntentHarvester.harvest(widget.repo, c.objectLabel, SituationContext.global, "APE Result: $interaction", 10);
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Action recorded to ledger."), backgroundColor: Color(0xFF00FFC8), duration: Duration(milliseconds: 800)));
   }
 
   @override Widget build(BuildContext context) {
@@ -184,7 +169,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ..._candidates.map((c) => _buildMorphicTile(c, constraints.maxWidth, constraints.maxHeight)),
           Positioned(top: 60, left: 24, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             const Text("SATYA SETU", style: TextStyle(letterSpacing: 4, fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF00FFC8))),
-            Text(MissionControlService().totalDetections > 0 ? "SOVEREIGN AGENT ACTIVE" : "SYNCHRONIZING RETINA...", style: const TextStyle(fontSize: 8, color: Colors.white38)),
+            const Text("APE HUB READY", style: TextStyle(fontSize: 8, color: Colors.white38)),
           ])),
         ]);
       }),

@@ -1,11 +1,11 @@
 /**
  * FILE: flutter_app/lib/models/intent_models.dart
- * VERSION: 6.0.0
- * PHASE: Phase 71.2 (APE Schema Support)
+ * VERSION: 7.0.0
+ * PHASE: Phase 76.2 (Schema Synchronization)
  * AUTHOR: SatyaSetu Principal Engineer
  * DESCRIPTION: 
- * 1. Added ApeResponse, ApeAffordance, and ApeAction for structured JSON parsing.
- * 2. Maintained legacy SituationState and MorphicAction for UI consistency.
+ * 1. Resolved build-error: Restored named parameter 'context' to ApeResponse.
+ * 2. Implemented null-safe factory for Fused and Async plans.
  */
 
 import 'package:flutter/material.dart';
@@ -18,12 +18,7 @@ class SituationState {
   final List<MorphicAction> actions;
   final Color themeColor;
 
-  SituationState({
-    required this.title,
-    required this.context,
-    required this.actions,
-    required this.themeColor,
-  });
+  SituationState({required this.title, required this.context, required this.actions, required this.themeColor});
 }
 
 class MorphicAction {
@@ -33,16 +28,9 @@ class MorphicAction {
   final String payloadType;
   final Function(BuildContext) onExecute;
 
-  MorphicAction({
-    required this.label,
-    required this.icon,
-    required this.description,
-    required this.payloadType,
-    required this.onExecute,
-  });
+  MorphicAction({required this.label, required this.icon, required this.description, required this.payloadType, required this.onExecute});
 }
 
-/// APE Response: The root container for structured affordance plans.
 class ApeResponse {
   final String label;
   final String context;
@@ -54,10 +42,13 @@ class ApeResponse {
     var affList = json['affordances'] as List? ?? [];
     return ApeResponse(
       label: json['object']?['label'] ?? "unknown",
-      context: json['context'] ?? "unknown",
+      context: json['context'] ?? "general",
       affordances: affList.map((i) => ApeAffordance.fromJson(i)).toList(),
     );
   }
+
+  static ApeResponse empty({String label = "unknown", String context = "general"}) => 
+      ApeResponse(label: label, context: context, affordances: []);
 }
 
 class ApeAffordance {
@@ -70,8 +61,8 @@ class ApeAffordance {
   factory ApeAffordance.fromJson(Map<String, dynamic> json) {
     var actList = json['actions'] as List? ?? [];
     return ApeAffordance(
-      name: json['name'],
-      confidence: (json['confidence'] as num).toDouble(),
+      name: json['name'] ?? "Unknown",
+      confidence: (json['confidence'] as num? ?? 0.0).toDouble(),
       actions: actList.map((i) => ApeAction.fromJson(i)).toList(),
     );
   }
@@ -86,9 +77,9 @@ class ApeAction {
 
   factory ApeAction.fromJson(Map<String, dynamic> json) {
     return ApeAction(
-      step: json['step'],
-      instruction: json['instruction'],
-      recordable: json['recordable'],
+      step: json['step'] ?? 0,
+      instruction: json['instruction'] ?? "No instruction",
+      recordable: json['recordable'] ?? false,
     );
   }
 }

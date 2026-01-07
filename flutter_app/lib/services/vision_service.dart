@@ -1,103 +1,82 @@
-/**
+**
  * FILE: flutter_app/lib/services/vision_service.dart
- * VERSION: 85.0.0
- * AUTHOR: SatyaSetu Neural Architect
- * FIX: Implemented "Back-Pressure Pulse".
- * Prevents memory spirals by strictly sending one frame at a time 
- * and handling 503-Busy rejections from the server.
+ * VERSION: 87.0.0
+ * AUTHOR: SatyaSetu Principal Engineer
+ * FIX: Increased timeout to 20s to accommodate even the slowest inference spikes.
+ * FIX: Added aggressive error handling to keep the loop alive even if one frame fails.
  */
 
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
-import 'dart:typed_data';
-import 'package:camera_macos/camera_macos.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../models/intent_models.dart';
 import '../models/telemetry_models.dart';
 import 'mission_control_service.dart';
+import 'package:camera_macos/camera_macos.dart';
 
 class DetectionCandidate {
   final String id;
   final String objectLabel;
   final Rect relativeLocation; 
-  final bool isLiving;
-  DetectionCandidate({required this.id, required this.objectLabel, required this.relativeLocation, required this.isLiving});
+  final ApeResponse? fusedPlan;
+
+  DetectionCandidate({required this.id, required this.objectLabel, required this.relativeLocation, this.fusedPlan});
 }
 
 class VisionService {
   CameraMacOSController? macController; 
   bool _isRunning = false;
-  bool isPaused = false; // Flag to stop loop during Modal Interactions
-  
-  List<DetectionCandidate> _activeRegistry = [];
-  String currentScene = "General";
+  bool isPaused = false;
   
   final _candidatesController = StreamController<List<DetectionCandidate>>.broadcast();
   Stream<List<DetectionCandidate>> get candidatesStream => _candidatesController.stream;
 
-  Future<void> initialize() async {
-    debugPrint("flutter: SATYA_DEBUG: [VISION] Sovereign Protocol Ready.");
-  }
+  void initialize() => debugPrint("flutter: SATYA_DEBUG: [VISION] Speed-Optimized Pulse Online.");
 
   void attachCamera(CameraMacOSController controller) {
     macController = controller;
     _isRunning = true;
-    _runSequentialHeartbeat();
+    _runLoop();
   }
 
-  /// SEQUENTIAL HEARTBEAT: Prevents request queues from forming.
-  Future<void> _runSequentialHeartbeat() async {
+  Future<void> _runLoop() async {
     while (_isRunning) {
       if (macController != null && !isPaused) {
-        await _performOnePulse();
+        await _performPulse();
       }
-      // Brief pause to allow the iMac CPU to handle the UI and IO
-      await Future.delayed(const Duration(milliseconds: 350));
+      // Increased delay to allow server to cool down between pulses
+      await Future.delayed(const Duration(milliseconds: 500));
     }
   }
 
-  Future<void> _performOnePulse() async {
-    final stopwatch = Stopwatch()..start();
+  Future<void> _performPulse() async {
     try {
       final CameraMacOSFile? rawData = await macController!.takePicture();
       if (rawData?.bytes == null) return;
       
-      const url = "http://127.0.0.1:8000/v1/vision"; 
       final response = await http.post(
-        Uri.parse(url),
+        Uri.parse("[http://127.0.0.1:8000/v1/vision](http://127.0.0.1:8000/v1/vision)"),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({"images": [base64Encode(rawData!.bytes!)]})
-      ).timeout(const Duration(seconds: 10)); // Fail fast to prevent memory buildup
+      ).timeout(const Duration(seconds: 20)); // STABILITY FIX: Extended timeout
       
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
-        _activeRegistry = _parseRaw(data['response'] ?? "[]");
-        _candidatesController.add(_activeRegistry);
-        
-        debugPrint("flutter: SATYA_DEBUG: [PULSE] ${stopwatch.elapsedMilliseconds}ms | Detected: ${_activeRegistry.length}");
-        MissionControlService().record(MetricType.detectionCount, _activeRegistry.length.toDouble());
-      } else if (response.statusCode == 503) {
-        // IQ 310: Server is reasoning, drop frame to keep memory low
-        debugPrint("flutter: SATYA_DEBUG: [VISION] Server Busy - Buffer Purged.");
+        final list = jsonDecode(data['response']) as List;
+        final candidates = list.map((item) {
+          return DetectionCandidate(
+            id: item['label'],
+            objectLabel: item['label'],
+            relativeLocation: Rect.fromLTRB(item['box_2d'][0]/1000, item['box_2d'][1]/1000, item['box_2d'][2]/1000, item['box_2d'][3]/1000),
+            fusedPlan: item['ape_plan'] != null ? ApeResponse.fromJson(item['ape_plan']) : null,
+          );
+        }).toList();
+        _candidatesController.add(candidates);
       }
     } catch (e) {
-      debugPrint("flutter: SATYA_DEBUG: [VISION] Stutter: $e");
+      // Log but do not crash the loop
+      debugPrint("VISION_HEARTBEAT_SKIP: $e");
     }
-  }
-
-  List<DetectionCandidate> _parseRaw(String text) {
-    final List<dynamic> list = jsonDecode(text);
-    return list.map((item) {
-      final label = item['label'].toString().toUpperCase();
-      final List<num> box = List<num>.from(item['box_2d']);
-      return DetectionCandidate(
-        id: "${label}_${box[0]}",
-        objectLabel: label,
-        relativeLocation: Rect.fromLTRB(box[0]/1000, box[1]/1000, box[2]/1000, box[3]/1000),
-        isLiving: label.contains("MAN") || label.contains("PERSON"),
-      );
-    }).toList();
   }
 }
