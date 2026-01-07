@@ -1,10 +1,10 @@
 /**
  * FILE: flutter_app/lib/services/vision_service.dart
- * VERSION: 81.0.0
- * PHASE: Phase 69.1 (Reactive Pulse Heartbeat)
+ * VERSION: 85.0.0
  * AUTHOR: SatyaSetu Neural Architect
- * FIX: Replaced Timer-based loop with a Sequential Request-Response cycle.
- * This prevents memory ballooning by ensuring only one request is in-flight.
+ * FIX: Implemented "Back-Pressure Pulse".
+ * Prevents memory spirals by strictly sending one frame at a time 
+ * and handling 503-Busy rejections from the server.
  */
 
 import 'dart:async';
@@ -29,6 +29,8 @@ class DetectionCandidate {
 class VisionService {
   CameraMacOSController? macController; 
   bool _isRunning = false;
+  bool isPaused = false; // Flag to stop loop during Modal Interactions
+  
   List<DetectionCandidate> _activeRegistry = [];
   String currentScene = "General";
   
@@ -36,24 +38,23 @@ class VisionService {
   Stream<List<DetectionCandidate>> get candidatesStream => _candidatesController.stream;
 
   Future<void> initialize() async {
-    debugPrint("flutter: SATYA_DEBUG: [VISION] Reactive Protocol Ready.");
+    debugPrint("flutter: SATYA_DEBUG: [VISION] Sovereign Protocol Ready.");
   }
 
   void attachCamera(CameraMacOSController controller) {
     macController = controller;
     _isRunning = true;
-    _startSequentialPulse();
+    _runSequentialHeartbeat();
   }
 
-  /// SEQUENTIAL PULSE: Send, Wait, then Schedule Next. 
-  /// Prevents memory leaks and request flooding.
-  Future<void> _startSequentialPulse() async {
+  /// SEQUENTIAL HEARTBEAT: Prevents request queues from forming.
+  Future<void> _runSequentialHeartbeat() async {
     while (_isRunning) {
-      if (macController != null) {
+      if (macController != null && !isPaused) {
         await _performOnePulse();
       }
-      // Brief pause to allow UI thread to breathe
-      await Future.delayed(const Duration(milliseconds: 300));
+      // Brief pause to allow the iMac CPU to handle the UI and IO
+      await Future.delayed(const Duration(milliseconds: 350));
     }
   }
 
@@ -68,19 +69,21 @@ class VisionService {
         Uri.parse(url),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({"images": [base64Encode(rawData!.bytes!)]})
-      ).timeout(const Duration(seconds: 15));
+      ).timeout(const Duration(seconds: 10)); // Fail fast to prevent memory buildup
       
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         _activeRegistry = _parseRaw(data['response'] ?? "[]");
         _candidatesController.add(_activeRegistry);
         
-        final latency = stopwatch.elapsedMilliseconds;
-        debugPrint("flutter: SATYA_DEBUG: [PULSE] Latency: ${latency}ms | Count: ${_activeRegistry.length}");
+        debugPrint("flutter: SATYA_DEBUG: [PULSE] ${stopwatch.elapsedMilliseconds}ms | Detected: ${_activeRegistry.length}");
         MissionControlService().record(MetricType.detectionCount, _activeRegistry.length.toDouble());
+      } else if (response.statusCode == 503) {
+        // IQ 310: Server is reasoning, drop frame to keep memory low
+        debugPrint("flutter: SATYA_DEBUG: [VISION] Server Busy - Buffer Purged.");
       }
     } catch (e) {
-      debugPrint("flutter: SATYA_DEBUG: [VISION] Heartbeat Stutter: $e");
+      debugPrint("flutter: SATYA_DEBUG: [VISION] Stutter: $e");
     }
   }
 

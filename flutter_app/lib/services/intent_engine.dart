@@ -1,9 +1,10 @@
 /**
  * FILE: flutter_app/lib/services/intent_engine.dart
- * VERSION: 3.9.0
+ * VERSION: 4.2.0
  * AUTHOR: SatyaSetu Neural Architect
- * DESCRIPTION: Implements the "2+3" Choice Separation.
- * Florence choices (Internal/Heuristic) + Gemma choices (External/LLM).
+ * DESCRIPTION: Implements the "APE" (Affordance Planning Engine).
+ * Florence actions are hardcoded here for 0ms latency.
+ * Gemma actions are fetched asynchronously.
  */
 
 import 'dart:convert';
@@ -13,47 +14,60 @@ import 'package:lucide_icons/lucide_icons.dart';
 import '../models/intent_models.dart';
 
 class IntentEngine {
-  /// CHOICE TIER 1: FLORENCE (Heuristic / Fast / Standardized)
+  /// AFFORDANCE PLANNING ENGINE: Maps detection labels to instant action choices.
   static SituationState resolveInstant(String label) {
     final String l = label.toUpperCase();
     final Color color = generateVibrantColor(l);
     
-    // Heuristic Map for instant engagement
+    // TIER 1: THE FLORENCE AFFORDANCES (Instant choices based on label mapping)
     List<MorphicAction> choices = [
       MorphicAction(
-        label: "Visual Ground Truth", 
+        label: "Visual Audit", 
         icon: LucideIcons.eye, 
-        description: "Standard physical verification of $label",
+        description: "Verified presence of $label",
         payloadType: "info",
         onExecute: (c) => {}
       ),
       MorphicAction(
-        label: "Registry Audit", 
+        label: "Ledger Record", 
         icon: LucideIcons.database, 
-        description: "Index $label to local ledger",
+        description: "Cryptographic index of $label",
         payloadType: "info",
         onExecute: (c) => {}
       ),
     ];
 
+    // INGENIOUS: Semantic Override (We can add custom mappings here for specific objects)
+    if (l.contains("TOMATO") || l.contains("VEGETABLE")) {
+      choices[1] = MorphicAction(
+        label: "Market Price Check", 
+        icon: LucideIcons.indianRupee, 
+        description: "Fetch local Mandi index",
+        payloadType: "info",
+        onExecute: (c) => {}
+      );
+    }
+
     return SituationState(title: "Perception Tier", actions: choices, themeColor: color, context: SituationContext.global);
   }
 
-  /// CHOICE TIER 2: GEMMA (Advanced / LLM / Async)
-  static Future<List<String>> fetchInquiries(String label, String sceneContext) async {
+  /// TIER 2: THE GEMMA INQUIRIES (Deep reasoning)
+  static Future<List<String>> fetchInquiries(String label) async {
     try {
       final response = await http.post(
         Uri.parse("http://127.0.0.1:8000/v1/reason"),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({"object": label, "context": sceneContext})
-      ).timeout(const Duration(seconds: 12));
+        body: jsonEncode({"object": label})
+      ).timeout(const Duration(seconds: 15));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         return List<String>.from(data['questions']);
       }
-    } catch (e) {}
-    return ["Utility of $label?", "Origin of $label?", "Value of $label?"];
+    } catch (e) {
+      debugPrint("flutter: SATYA_DEBUG: [APE] Inquiry fallback triggered.");
+    }
+    return ["Properties of $label?", "Origin of $label?", "Value of $label?"];
   }
 
   static Color generateVibrantColor(String text) {
