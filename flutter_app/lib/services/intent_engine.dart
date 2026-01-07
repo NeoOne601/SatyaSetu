@@ -1,10 +1,12 @@
 /**
  * FILE: flutter_app/lib/services/intent_engine.dart
- * VERSION: 4.2.0
- * AUTHOR: SatyaSetu Neural Architect
- * DESCRIPTION: Implements the "APE" (Affordance Planning Engine).
- * Florence actions are hardcoded here for 0ms latency.
- * Gemma actions are fetched asynchronously.
+ * VERSION: 5.2.0
+ * PHASE: Phase 71.3 (Sovereign Context Logic)
+ * AUTHOR: SatyaSetu Principal Engineer
+ * DESCRIPTION: 
+ * 1. Computes allowed affordances locally using context-aware application logic.
+ * 2. Dispatches structured requests to the APE server.
+ * 3. Standardized naming for build stability across the project.
  */
 
 import 'dart:convert';
@@ -14,63 +16,75 @@ import 'package:lucide_icons/lucide_icons.dart';
 import '../models/intent_models.dart';
 
 class IntentEngine {
-  /// AFFORDANCE PLANNING ENGINE: Maps detection labels to instant action choices.
+  /// TIER 1: Resolves immediate perception actions locally (0ms latency).
   static SituationState resolveInstant(String label) {
     final String l = label.toUpperCase();
-    final Color color = generateVibrantColor(l);
-    
-    // TIER 1: THE FLORENCE AFFORDANCES (Instant choices based on label mapping)
-    List<MorphicAction> choices = [
-      MorphicAction(
-        label: "Visual Audit", 
-        icon: LucideIcons.eye, 
-        description: "Verified presence of $label",
-        payloadType: "info",
-        onExecute: (c) => {}
-      ),
-      MorphicAction(
-        label: "Ledger Record", 
-        icon: LucideIcons.database, 
-        description: "Cryptographic index of $label",
-        payloadType: "info",
-        onExecute: (c) => {}
-      ),
-    ];
-
-    // INGENIOUS: Semantic Override (We can add custom mappings here for specific objects)
-    if (l.contains("TOMATO") || l.contains("VEGETABLE")) {
-      choices[1] = MorphicAction(
-        label: "Market Price Check", 
-        icon: LucideIcons.indianRupee, 
-        description: "Fetch local Mandi index",
-        payloadType: "info",
-        onExecute: (c) => {}
-      );
-    }
-
-    return SituationState(title: "Perception Tier", actions: choices, themeColor: color, context: SituationContext.global);
+    return SituationState(
+      title: "Identity Pulse",
+      actions: [
+        MorphicAction(
+          label: "Visual Truth",
+          icon: LucideIcons.eye,
+          description: "Florence confirm: $label",
+          payloadType: "info",
+          onExecute: (c) => {},
+        ),
+        MorphicAction(
+          label: "Ledger Commit",
+          icon: LucideIcons.database,
+          description: "Record presence in local hub",
+          payloadType: "info",
+          onExecute: (c) => {},
+        ),
+      ],
+      themeColor: generateVibrantColor(l),
+      context: SituationContext.global,
+    );
   }
 
-  /// TIER 2: THE GEMMA INQUIRIES (Deep reasoning)
-  static Future<List<String>> fetchInquiries(String label) async {
+  /// APPLICATION LOGIC: Decides which affordances are valid for the object/context pair.
+  static List<String> computeAllowedAffordances(String label, String context) {
+    final l = label.toUpperCase();
+    if (l.contains("TOMATO") || l.contains("VEGETABLE")) {
+      return context == "market" ? ["buy", "inspect_quality", "record_price"] : ["cook", "nutrition", "store"];
+    }
+    if (l.contains("FACE") || l.contains("PERSON")) {
+      return ["verify_identity", "record_encounter", "social_ledger"];
+    }
+    if (l.contains("PHONE") || l.contains("DEVICE")) {
+      return ["inspect", "usage", "record_state"];
+    }
+    return ["inspect", "record_interaction", "usage", "safety"];
+  }
+
+  /// TIER 2: Requests structured action chains from the Gemma APE core.
+  static Future<ApeResponse> fetchAffordances(String label, String context) async {
+    final allowed = computeAllowedAffordances(label, context);
+
     try {
       final response = await http.post(
         Uri.parse("http://127.0.0.1:8000/v1/reason"),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({"object": label})
+        body: jsonEncode({
+          "object": {"label": label, "confidence": 0.99},
+          "context": context,
+          "attributes": {},
+          "allowed_affordances": allowed
+        }),
       ).timeout(const Duration(seconds: 15));
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        return List<String>.from(data['questions']);
+        return ApeResponse.fromJson(jsonDecode(response.body));
       }
     } catch (e) {
-      debugPrint("flutter: SATYA_DEBUG: [APE] Inquiry fallback triggered.");
+      debugPrint("APE_HANDSHAKE_STUTTER: $e");
     }
-    return ["Properties of $label?", "Origin of $label?", "Value of $label?"];
+    // Safe Fallback UI trigger
+    return ApeResponse(label: label, context: context, affordances: []);
   }
 
   static Color generateVibrantColor(String text) {
-    return HSVColor.fromAHSV(1.0, (text.hashCode % 360).toDouble(), 0.8, 0.95).toColor();
+    final int hash = text.hashCode;
+    return HSVColor.fromAHSV(1.0, (hash % 360).toDouble(), 0.8, 0.95).toColor();
   }
 }

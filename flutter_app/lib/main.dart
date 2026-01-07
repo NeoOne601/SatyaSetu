@@ -1,11 +1,12 @@
 /**
  * FILE: flutter_app/lib/main.dart
- * VERSION: 61.0.0
- * AUTHOR: SatyaSetu Neural Architect
- * FIX:
- * 1. Rendering: Wrapped modal in scrollable view with BoxConstraints.
- * 2. Interaction: Pauses vision stream during reasoning to protect VRAM.
- * 3. Contract: Implements the "2+3" choice logic via the APE engine.
+ * VERSION: 66.0.0
+ * PHASE: Phase 71.4 (APE Checklist UI Deployment)
+ * AUTHOR: SatyaSetu Principal Engineer
+ * DESCRIPTION: 
+ * 1. Replaced question cards with structured, recordable APE Action Chains.
+ * 2. Implemented hardware state management (pausing vision for reasoning).
+ * 3. Resolved overflow layouts to maintain absolute UI stability.
  */
 
 import 'dart:io';
@@ -91,10 +92,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _showIntentCard(DetectionCandidate candidate) {
-    // 1. TIER 1 CHOICES: INSTANT (Heuristic Engine)
     final instantState = IntentEngine.resolveInstant(candidate.objectLabel);
-    
-    // IQ 310: PAUSE VISION DURING REASONING
     widget.visionService.isPaused = true;
     
     showModalBottomSheet(
@@ -116,39 +114,51 @@ class _HomeScreenState extends State<HomeScreen> {
                 Text(candidate.objectLabel, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
                 const Divider(height: 32, color: Colors.white10),
                 
-                // Tier 1: 2 Florence Choices (Instant)
                 ...instantState.actions.map((a) => ListTile(
                   dense: true,
                   leading: Icon(a.icon, color: instantState.themeColor, size: 20),
                   title: Text(a.label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
                   subtitle: Text(a.description, style: const TextStyle(fontSize: 10, color: Colors.white54)),
-                  onTap: () { Navigator.pop(c); _harvestInteraction(candidate, a.label); },
+                  onTap: () { Navigator.pop(c); _harvest(candidate, "Perception: ${a.label}"); },
                 )),
                 
                 const SizedBox(height: 20),
-                const Row(children: [Icon(LucideIcons.brainCircuit, size: 14, color: Colors.blueAccent), SizedBox(width: 8), Text("GEMMA INQUIRIES (ADVANCED)", style: TextStyle(fontSize: 9, letterSpacing: 1, fontWeight: FontWeight.bold, color: Colors.blueAccent))]),
+                const Row(children: [Icon(LucideIcons.listChecks, size: 14, color: Colors.blueAccent), SizedBox(width: 8), Text("AFFORDANCE ACTION CHAINS", style: TextStyle(fontSize: 9, letterSpacing: 1, fontWeight: FontWeight.bold, color: Colors.blueAccent))]),
                 const SizedBox(height: 12),
 
-                // Tier 2: 3 Gemma Choices (Async)
-                Container(
-                  decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(16)),
-                  child: FutureBuilder<List<String>>(
-                    future: IntentEngine.fetchInquiries(candidate.objectLabel),
-                    builder: (context, snapshot) {
-                      if (!snapshot.hasData) return const ListTile(title: Text("Synthesizing context...", style: TextStyle(fontSize: 12, color: Colors.white38)));
-                      return Column(
-                        children: snapshot.data!.map((q) => ListTile(
-                          dense: true,
-                          title: Text(q, style: const TextStyle(fontSize: 12)),
-                          trailing: const Icon(LucideIcons.zap, size: 12, color: Colors.blueAccent),
-                          onTap: () {
-                            Navigator.pop(c);
-                            _harvestInteraction(candidate, q);
-                          },
-                        )).toList(),
+                FutureBuilder<ApeResponse>(
+                  future: IntentEngine.fetchAffordances(candidate.objectLabel, "market"),
+                  builder: (context, snapshot) {
+                    if (!snapshot.hasData) return const ListTile(title: Text("Compiling plans...", style: TextStyle(fontSize: 12, color: Colors.white38)));
+                    
+                    if (snapshot.data!.affordances.isEmpty) {
+                      return ListTile(
+                        title: const Text("Handshake delay. Try again.", style: TextStyle(fontSize: 12, color: Colors.redAccent)),
+                        trailing: IconButton(icon: const Icon(LucideIcons.refreshCcw, size: 16), onPressed: () => setState((){})),
                       );
-                    },
-                  ),
+                    }
+                    
+                    return Column(
+                      children: snapshot.data!.affordances.map((aff) => Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(16)),
+                        child: ExpansionTile(
+                          title: Text(aff.name.toUpperCase(), style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.blueAccent)),
+                          subtitle: Text("Certainty: ${(aff.confidence * 100).toInt()}%", style: const TextStyle(fontSize: 10, color: Colors.white38)),
+                          children: aff.actions.map((act) => ListTile(
+                            dense: true,
+                            leading: CircleAvatar(radius: 10, backgroundColor: Colors.white10, child: Text("${act.step}", style: const TextStyle(fontSize: 9))),
+                            title: Text(act.instruction, style: const TextStyle(fontSize: 11)),
+                            trailing: act.recordable ? const Icon(LucideIcons.fingerprint, size: 14, color: Color(0xFF00FFC8)) : null,
+                            onTap: () {
+                              Navigator.pop(c);
+                              _harvest(candidate, "Plan: ${aff.name} step ${act.step}");
+                            },
+                          )).toList(),
+                        ),
+                      )).toList(),
+                    );
+                  },
                 ),
               ],
             ),
@@ -156,14 +166,13 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     ).whenComplete(() {
-      // IQ 310: RESUME VISION HEARTBEAT
       widget.visionService.isPaused = false;
     });
   }
 
-  void _harvestInteraction(DetectionCandidate c, String decision) async {
-    await IntentHarvester.harvest(widget.repo, c.objectLabel, SituationContext.global, "Trust Decision: $decision", 10);
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Trust interaction recorded to ledger."), backgroundColor: Color(0xFF00FFC8), duration: Duration(milliseconds: 800)));
+  void _harvest(DetectionCandidate c, String interaction) async {
+    await IntentHarvester.harvest(widget.repo, c.objectLabel, SituationContext.global, "APE Choice: $interaction", 10);
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Trust interaction committed to ledger."), backgroundColor: Color(0xFF00FFC8), duration: Duration(milliseconds: 800)));
   }
 
   @override Widget build(BuildContext context) {
@@ -175,7 +184,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ..._candidates.map((c) => _buildMorphicTile(c, constraints.maxWidth, constraints.maxHeight)),
           Positioned(top: 60, left: 24, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             const Text("SATYA SETU", style: TextStyle(letterSpacing: 4, fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF00FFC8))),
-            Text(MissionControlService().totalDetections > 0 ? "PRIVATE HUB ACTIVE" : "SYNCHRONIZING...", style: const TextStyle(fontSize: 8, color: Colors.white38)),
+            Text(MissionControlService().totalDetections > 0 ? "SOVEREIGN AGENT ACTIVE" : "SYNCHRONIZING RETINA...", style: const TextStyle(fontSize: 8, color: Colors.white38)),
           ])),
         ]);
       }),
