@@ -1,11 +1,11 @@
 /**
  * FILE: flutter_app/lib/models/intent_models.dart
- * VERSION: 7.0.0
- * PHASE: Phase 76.2 (Schema Synchronization)
+ * VERSION: 8.0.0
  * AUTHOR: SatyaSetu Principal Engineer
- * DESCRIPTION: 
- * 1. Resolved build-error: Restored named parameter 'context' to ApeResponse.
- * 2. Implemented null-safe factory for Fused and Async plans.
+ * DESCRIPTION: Data Schema for Interaction Lifecycle.
+ * - APE Response models for affordances
+ * - ActivitySession for tracking complete interaction flow
+ * - StepCompletion for step-by-step progress
  */
 
 import 'package:flutter/material.dart';
@@ -41,7 +41,7 @@ class ApeResponse {
   factory ApeResponse.fromJson(Map<String, dynamic> json) {
     var affList = json['affordances'] as List? ?? [];
     return ApeResponse(
-      label: json['object']?['label'] ?? "unknown",
+      label: json['object']?['label'] ?? json['label'] ?? "unknown",
       context: json['context'] ?? "general",
       affordances: affList.map((i) => ApeAffordance.fromJson(i)).toList(),
     );
@@ -61,8 +61,8 @@ class ApeAffordance {
   factory ApeAffordance.fromJson(Map<String, dynamic> json) {
     var actList = json['actions'] as List? ?? [];
     return ApeAffordance(
-      name: json['name'] ?? "Unknown",
-      confidence: (json['confidence'] as num? ?? 0.0).toDouble(),
+      name: json['name'] ?? "Action Group",
+      confidence: (json['confidence'] as num? ?? 1.0).toDouble(),
       actions: actList.map((i) => ApeAction.fromJson(i)).toList(),
     );
   }
@@ -78,8 +78,105 @@ class ApeAction {
   factory ApeAction.fromJson(Map<String, dynamic> json) {
     return ApeAction(
       step: json['step'] ?? 0,
-      instruction: json['instruction'] ?? "No instruction",
+      instruction: json['instruction'] ?? "Follow standard protocol",
       recordable: json['recordable'] ?? false,
     );
   }
+}
+
+// ============================================================================
+// INTERACTION LIFECYCLE MODELS
+// ============================================================================
+
+/// Tracks completion of a single step in an affordance chain
+class StepCompletion {
+  final String affordanceName;
+  final int stepIndex;
+  final DateTime completedAt;
+  final String? note;
+
+  StepCompletion({
+    required this.affordanceName,
+    required this.stepIndex,
+    required this.completedAt,
+    this.note,
+  });
+
+  Map<String, dynamic> toJson() => {
+    'affordance': affordanceName,
+    'step': stepIndex,
+    'completedAt': completedAt.toIso8601String(),
+    'note': note,
+  };
+}
+
+/// Tracks a complete interaction session from object detection to rating
+class ActivitySession {
+  final String objectLabel;
+  final String category;
+  final ApeResponse affordanceResponse;
+  final List<StepCompletion> completedSteps;
+  final DateTime startTime;
+  DateTime? endTime;
+  int? userRating; // 1-5 stars
+  String? userNote;
+  bool isCompleted;
+
+  ActivitySession({
+    required this.objectLabel,
+    required this.category,
+    required this.affordanceResponse,
+    List<StepCompletion>? completedSteps,
+    DateTime? startTime,
+    this.endTime,
+    this.userRating,
+    this.userNote,
+    this.isCompleted = false,
+  }) : completedSteps = completedSteps ?? [],
+       startTime = startTime ?? DateTime.now();
+
+  /// Mark a step as completed
+  void completeStep(String affordanceName, int stepIndex, {String? note}) {
+    completedSteps.add(StepCompletion(
+      affordanceName: affordanceName,
+      stepIndex: stepIndex,
+      completedAt: DateTime.now(),
+      note: note,
+    ));
+  }
+
+  /// Check if a specific step is completed
+  bool isStepCompleted(String affordanceName, int stepIndex) {
+    return completedSteps.any((s) => s.affordanceName == affordanceName && s.stepIndex == stepIndex);
+  }
+
+  /// Get total number of steps across all affordances
+  int get totalSteps => affordanceResponse.affordances.fold(0, (sum, a) => sum + a.actions.length);
+
+  /// Get number of completed steps
+  int get completedStepCount => completedSteps.length;
+
+  /// Get completion percentage
+  double get completionPercentage => totalSteps > 0 ? completedStepCount / totalSteps : 0.0;
+
+  /// Finalize the session with rating
+  void finalize(int rating, {String? note}) {
+    userRating = rating;
+    userNote = note;
+    endTime = DateTime.now();
+    isCompleted = true;
+  }
+
+  /// Convert to JSON for DID storage
+  Map<String, dynamic> toJson() => {
+    'objectLabel': objectLabel,
+    'category': category,
+    'affordances': affordanceResponse.affordances.map((a) => a.name).toList(),
+    'completedSteps': completedSteps.map((s) => s.toJson()).toList(),
+    'startTime': startTime.toIso8601String(),
+    'endTime': endTime?.toIso8601String(),
+    'rating': userRating,
+    'note': userNote,
+    'completionPercentage': completionPercentage,
+  };
 }
