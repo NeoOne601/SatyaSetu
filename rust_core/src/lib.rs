@@ -6,6 +6,7 @@ pub mod parser;
 pub mod persistence;
 pub mod telemetry;
 pub mod service;
+pub mod spatial; /* [NEW] Expose spatial module for Phase 10 */
 
 // The bridge_generated file is managed by flutter_rust_bridge_codegen
 mod bridge_generated;

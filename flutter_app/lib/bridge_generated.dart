@@ -48,6 +48,11 @@ abstract class RustCore {
   Future<bool> rustResetVault({required String storagePath, dynamic hint});
 
   FlutterRustBridgeTaskConstMeta get kRustResetVaultConstMeta;
+
+  Future<String> rustCalculateSpatialCell(
+      {required double lat, required double lng, dynamic hint});
+
+  FlutterRustBridgeTaskConstMeta get kRustCalculateSpatialCellConstMeta;
 }
 
 class SatyaIdentity {
@@ -227,6 +232,27 @@ class RustCoreImpl implements RustCore {
         argNames: ["storagePath"],
       );
 
+  Future<String> rustCalculateSpatialCell(
+      {required double lat, required double lng, dynamic hint}) {
+    var arg0 = api2wire_f64(lat);
+    var arg1 = api2wire_f64(lng);
+    return _platform.executeNormal(FlutterRustBridgeTask(
+      callFfi: (port_) =>
+          _platform.inner.wire_rust_calculate_spatial_cell(port_, arg0, arg1),
+      parseSuccessData: _wire2api_String,
+      parseErrorData: null,
+      constMeta: kRustCalculateSpatialCellConstMeta,
+      argValues: [lat, lng],
+      hint: hint,
+    ));
+  }
+
+  FlutterRustBridgeTaskConstMeta get kRustCalculateSpatialCellConstMeta =>
+      const FlutterRustBridgeTaskConstMeta(
+        debugName: "rust_calculate_spatial_cell",
+        argNames: ["lat", "lng"],
+      );
+
   void dispose() {
     _platform.dispose();
   }
@@ -273,6 +299,11 @@ class RustCoreImpl implements RustCore {
 }
 
 // Section: api2wire
+
+@protected
+double api2wire_f64(double raw) {
+  return raw;
+}
 
 @protected
 int api2wire_u8(int raw) {
@@ -507,6 +538,18 @@ class RustCoreWire implements FlutterRustBridgeWireBase {
               ffi.Pointer<wire_uint_8_list>)>>('wire_rust_reset_vault');
   late final _wire_rust_reset_vault = _wire_rust_reset_vaultPtr
       .asFunction<void Function(int, ffi.Pointer<wire_uint_8_list>)>();
+
+  void wire_rust_calculate_spatial_cell(int port_, double lat, double lng) {
+    return _wire_rust_calculate_spatial_cell(port_, lat, lng);
+  }
+
+  late final _wire_rust_calculate_spatial_cellPtr = _lookup<
+      ffi.NativeFunction<
+          ffi.Void Function(ffi.Int64, ffi.Double,
+              ffi.Double)>>('wire_rust_calculate_spatial_cell');
+  late final _wire_rust_calculate_spatial_cell =
+      _wire_rust_calculate_spatial_cellPtr
+          .asFunction<void Function(int, double, double)>();
 
   ffi.Pointer<wire_uint_8_list> new_uint_8_list_0(int len) {
     return _new_uint_8_list_0(len);

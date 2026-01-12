@@ -50,6 +50,11 @@ pub extern "C" fn wire_rust_reset_vault(port_: i64, storage_path: *mut wire_uint
     wire_rust_reset_vault_impl(port_, storage_path)
 }
 
+#[no_mangle]
+pub extern "C" fn wire_rust_calculate_spatial_cell(port_: i64, lat: f64, lng: f64) {
+    wire_rust_calculate_spatial_cell_impl(port_, lat, lng)
+}
+
 // Section: allocate functions
 
 #[no_mangle]

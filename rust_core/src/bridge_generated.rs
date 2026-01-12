@@ -140,6 +140,24 @@ fn wire_rust_reset_vault_impl(
         },
     )
 }
+fn wire_rust_calculate_spatial_cell_impl(
+    port_: MessagePort,
+    lat: impl Wire2Api<f64> + UnwindSafe,
+    lng: impl Wire2Api<f64> + UnwindSafe,
+) {
+    FLUTTER_RUST_BRIDGE_HANDLER.wrap::<_, _, _, String, _>(
+        WrapInfo {
+            debug_name: "rust_calculate_spatial_cell",
+            port: Some(port_),
+            mode: FfiCallMode::Normal,
+        },
+        move || {
+            let api_lat = lat.wire2api();
+            let api_lng = lng.wire2api();
+            move |task_callback| Result::<_, ()>::Ok(rust_calculate_spatial_cell(api_lat, api_lng))
+        },
+    )
+}
 // Section: wrapper structs
 
 // Section: static checks
@@ -163,6 +181,11 @@ where
     }
 }
 
+impl Wire2Api<f64> for f64 {
+    fn wire2api(self) -> f64 {
+        self
+    }
+}
 impl Wire2Api<u8> for u8 {
     fn wire2api(self) -> u8 {
         self

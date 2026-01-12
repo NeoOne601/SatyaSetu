@@ -1,15 +1,15 @@
 /**
  * FILE: rust_core/src/api.rs
- * VERSION: 2.1.2
- * PHASE: Phase 9.1 (Runtime Stability)
- * GOAL: Maintain persistent relay connections and prevent 'No Reactor' panics.
- * FIX: Implemented a global STATIC_RUNTIME to keep the Tokio reactor alive.
+ * VERSION: 42.0.0 (Merged)
+ * PHASE: Phase 10.1 + Phase 9.1 (Runtime Stability)
+ * GOAL: Maintain persistent relay connections AND expose Spatial Intelligence.
  */
 
 use crate::persistence::{VaultManager, SatyaVault};
 use crate::crypto::{VaultKey, sign_with_key, verify_with_key};
 use crate::domain::{SatyaIdentity, SignedIntent, IntentPayload, InteractionType, PROTOCOL_VERSION};
 use crate::parser::parse_upi_url;
+use crate::spatial::SpatialIndexer; // [NEW] Phase 10 Import
 use anyhow::{Result, anyhow};
 use std::sync::Mutex;
 use once_cell::sync::Lazy;
@@ -24,7 +24,7 @@ use tokio::runtime::Runtime;
 use hmac::Mac; 
 use sha2::Sha512;
 
-// Persistent Global Runtime and Client
+// Persistent Global Runtime and Client (Phase 9.1 Fix)
 static STATIC_RUNTIME: Lazy<Runtime> = Lazy::new(|| {
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
@@ -172,4 +172,10 @@ pub fn rust_reset_vault(storage_path: String) -> Result<bool> {
         fs::rename(&path, path.with_extension(format!("mismatch_{}", ts)))?;
     }
     Ok(true)
+}
+
+// --- NEW SPATIAL API (Phase 10.1) ---
+
+pub fn rust_calculate_spatial_cell(lat: f64, lng: f64) -> String {
+    SpatialIndexer::calculate_cell_id(lat, lng)
 }
