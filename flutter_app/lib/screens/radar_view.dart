@@ -1,17 +1,20 @@
 /**
  * FILE: flutter_app/lib/screens/radar_view.dart
- * VERSION: 1.0.0
- * PHASE: Phase 10.2
- * DESCRIPTION: Visualizes the "Trust Air" using a scanning radar UI.
+ * VERSION: 1.1.0
+ * PHASE: Phase 10.3
+ * DESCRIPTION: Visualizes camera detection candidates as blips on a radar.
+ * CHANGE: Updated to accept DetectionCandidate list from VisionService.
  */
 
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import '../services/discovery_service.dart';
+import '../services/vision_service.dart'; // Changed import to use detection candidates
 
 class RadarView extends StatefulWidget {
-  final DiscoveryService discoveryService;
-  const RadarView({super.key, required this.discoveryService});
+  // CHANGED: Now accepts visual candidates instead of discovery service
+  final List<DetectionCandidate> candidates;
+  
+  const RadarView({super.key, required this.candidates});
 
   @override
   State<RadarView> createState() => _RadarViewState();
@@ -19,7 +22,6 @@ class RadarView extends StatefulWidget {
 
 class _RadarViewState extends State<RadarView> with SingleTickerProviderStateMixin {
   late AnimationController _controller;
-  List<DiscoveryNode> _nodes = [];
 
   @override
   void initState() {
@@ -28,10 +30,6 @@ class _RadarViewState extends State<RadarView> with SingleTickerProviderStateMix
       vsync: this,
       duration: const Duration(seconds: 4),
     )..repeat();
-
-    widget.discoveryService.radarPulse.listen((nodes) {
-      if (mounted) setState(() => _nodes = nodes);
-    });
   }
 
   @override
@@ -52,6 +50,7 @@ class _RadarViewState extends State<RadarView> with SingleTickerProviderStateMix
       ),
       child: Stack(
         children: [
+          // The spinning sweep animation
           AnimatedBuilder(
             animation: _controller,
             builder: (_, __) {
@@ -61,47 +60,55 @@ class _RadarViewState extends State<RadarView> with SingleTickerProviderStateMix
               );
             },
           ),
-          ..._nodes.map((node) => _buildBlip(node)),
+          // The visual blips
+          ...widget.candidates.map((c) => _buildVisualBlip(c)),
+          // The center point (User)
           Center(child: Container(width: 8, height: 8, decoration: const BoxDecoration(color: Color(0xFF00FFC8), shape: BoxShape.circle))),
         ],
       ),
     );
   }
 
-  Widget _buildBlip(DiscoveryNode node) {
-    final normalizedDist = ((node.rssi.clamp(-90, -20) + 90) / 70); 
-    final distance = 1.0 - normalizedDist;
-    final angle = (node.id.hashCode % 360) * (math.pi / 180);
+  Widget _buildVisualBlip(DetectionCandidate candidate) {
+    // Map the relative location (0.0 to 1.0) to radar coordinates
+    // We map X (horizontal) to Angle, and Y (distance) to Radius for a cool effect
     
-    final radius = 90.0 * distance;
-    final x = 100 + radius * math.cos(angle);
-    final y = 100 + radius * math.sin(angle);
+    // Center of radar is 50, 50 (relative to 100x100 container internal size logic)
+    // But since this is inside a Stack, we use pixel offsets.
+    
+    // Simple Mapping:
+    // Left/Right on screen -> Angle on Radar
+    // Top/Bottom on screen -> Distance on Radar
+    
+    // Normalize X from 0..1 to -PI/4 .. PI/4 (Front cone view)
+    final double angle = (candidate.relativeLocation.center.dx - 0.5) * (math.pi / 2);
+    
+    // Normalize Y (distance): Bottom of screen is close (0), Top is far (1)
+    // But usually in camera AR, Top is "Far" and Bottom is "Close".
+    // Let's invert Y so 1.0 (bottom) is close (center of radar)
+    final double distance = (1.0 - candidate.relativeLocation.center.dy).clamp(0.1, 0.9);
+    
+    final double radius = distance * 90.0; // 90 is radius of radar content
+    
+    final double x = 100 + radius * math.sin(angle);
+    final double y = 100 - radius * math.cos(angle);
 
     return Positioned(
-      left: x - 6,
-      top: y - 6,
+      left: x - 4,
+      top: y - 4,
       child: Tooltip(
-        message: "${node.sector.toUpperCase()}\nKarma: ${node.karmaScore.toStringAsFixed(1)}",
+        message: candidate.objectLabel,
         child: Container(
-          width: 12,
-          height: 12,
+          width: 8,
+          height: 8,
           decoration: BoxDecoration(
-            color: _getSectorColor(node.sector).withOpacity(0.8),
+            color: const Color(0xFF00FFC8).withOpacity(0.8),
             shape: BoxShape.circle,
-            boxShadow: [BoxShadow(color: _getSectorColor(node.sector), blurRadius: 6)],
+            boxShadow: const [BoxShadow(color: Color(0xFF00FFC8), blurRadius: 6)],
           ),
         ),
       ),
     );
-  }
-
-  Color _getSectorColor(String sector) {
-    switch (sector) {
-      case 'transport': return Colors.blueAccent;
-      case 'trade': return Colors.amber;
-      case 'civic': return Colors.purpleAccent;
-      default: return Colors.white;
-    }
   }
 }
 

@@ -1,9 +1,9 @@
 /**
  * FILE: flutter_app/lib/main.dart
- * VERSION: 84.1.0
+ * VERSION: 84.3.0
  * AUTHOR: SatyaSetu Principal Engineer
  * DESCRIPTION: Industrial Grade Trust Interface.
- * FIX: Added Platform-aware Camera Initialization (iOS vs macOS).
+ * FIX: Implemented "Cover" scaling for CameraPreview to prevent stretching/distortion.
  */
 
 import 'dart:convert';
@@ -21,6 +21,9 @@ import 'services/intent_harvester.dart';
 import 'services/intent_engine.dart';
 import 'identity_repo.dart';
 import 'models/intent_models.dart';
+
+import 'screens/radar_view.dart';
+import 'screens/mission_control_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -88,7 +91,6 @@ class _HomeScreenState extends State<HomeScreen> {
     widget.visionService.initialize();
     widget.visionService.candidatesStream.listen((c) { if (mounted) setState(() => _candidates = c); });
     
-    // Initialize Mobile Camera if not on macOS
     if (!Platform.isMacOS) {
       _initMobileCamera();
     }
@@ -99,7 +101,6 @@ class _HomeScreenState extends State<HomeScreen> {
       final cameras = await availableCameras();
       if (cameras.isEmpty) return;
       
-      // Use the back camera
       final firstCamera = cameras.firstWhere(
         (camera) => camera.lensDirection == CameraLensDirection.back,
         orElse: () => cameras.first,
@@ -107,7 +108,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
       _mobileCameraController = CameraController(
         firstCamera, 
-        ResolutionPreset.medium, 
+        ResolutionPreset.medium, // Using medium for faster inference/transfer
         enableAudio: false,
         imageFormatGroup: Platform.isAndroid ? ImageFormatGroup.jpeg : ImageFormatGroup.bgra8888,
       );
@@ -116,7 +117,6 @@ class _HomeScreenState extends State<HomeScreen> {
       
       if (mounted) {
         setState(() => _isMobileCameraReady = true);
-        // Connect the mobile camera to the Vision Service
         widget.visionService.attachMobileCamera(_mobileCameraController!);
       }
     } catch (e) {
@@ -146,6 +146,34 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  void _openMissionControl() {
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => const MissionControlScreen()));
+  }
+
+  /// Builds the mobile camera preview with correct Aspect Ratio scaling
+  Widget _buildMobileCameraPreview(BoxConstraints constraints) {
+    if (!_isMobileCameraReady || _mobileCameraController == null) {
+      return const Center(child: CircularProgressIndicator(color: Color(0xFF00FFC8)));
+    }
+
+    final camera = _mobileCameraController!.value;
+    final size = constraints.biggest;
+    
+    // Calculate scale to "Cover" the screen
+    // Camera aspect ratio is usually inverted on mobile portrait (width < height)
+    double scale = size.aspectRatio * camera.aspectRatio;
+
+    // Adjust scale if it's less than 1 to ensure coverage
+    if (scale < 1) scale = 1 / scale;
+
+    return Transform.scale(
+      scale: scale,
+      child: Center(
+        child: CameraPreview(_mobileCameraController!),
+      ),
+    );
+  }
+
   @override Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
@@ -154,25 +182,40 @@ class _HomeScreenState extends State<HomeScreen> {
           // LAYER 1: PLATFORM AWARE CAMERA
           Positioned.fill(
             child: Opacity(
-              opacity: 0.5, 
+              opacity: 0.6, // Increased opacity slightly for better visibility
               child: Platform.isMacOS 
-                // macOS Camera
                 ? CameraMacOSView(cameraMode: CameraMacOSMode.photo, onCameraInizialized: (c) => widget.visionService.attachCamera(c))
-                // iOS/Android Camera
-                : (_isMobileCameraReady && _mobileCameraController != null) 
-                    ? CameraPreview(_mobileCameraController!)
-                    : const Center(child: CircularProgressIndicator(color: Color(0xFF00FFC8)))
+                : _buildMobileCameraPreview(constraints)
             )
           ),
           
           // LAYER 2: AUGMENTED REALITY OVERLAYS
           ..._candidates.map((c) => _buildMorphicTile(c, constraints.maxWidth, constraints.maxHeight)),
           
-          // LAYER 3: HUD
-          Positioned(top: 60, left: 24, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            const Text("SATYA SETU", style: TextStyle(letterSpacing: 4, fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF00FFC8))),
-            const Text("RECOVERY HUB ACTIVE", style: TextStyle(fontSize: 8, color: Colors.white38)),
-          ])),
+          // LAYER 3: HUD TOP
+          Positioned(
+            top: 60, left: 24, right: 24,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  const Text("SATYA SETU", style: TextStyle(letterSpacing: 4, fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF00FFC8))),
+                  const Text("RECOVERY HUB ACTIVE", style: TextStyle(fontSize: 8, color: Colors.white38)),
+                ]),
+                IconButton(
+                  onPressed: _openMissionControl,
+                  icon: const Icon(LucideIcons.activity, color: Color(0xFF00FFC8), size: 28),
+                  tooltip: "Mission Control",
+                )
+              ],
+            )
+          ),
+
+          // LAYER 4: HUD BOTTOM (RADAR)
+          Positioned(
+            bottom: 30, right: 20, 
+            child: SizedBox(width: 100, height: 100, child: RadarView(candidates: _candidates))
+          ),
         ]);
       }),
     );

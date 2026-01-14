@@ -1,9 +1,9 @@
 /**
  * FILE: flutter_app/lib/services/vision_service.dart
- * VERSION: 100.2.0
+ * VERSION: 100.3.0
  * AUTHOR: SatyaSetu Principal Engineer
- * DESCRIPTION: Industrial Vision Pulse with Network Configuration.
- * CHANGE: Updated server URL to point to Mac's local IP for physical device testing.
+ * DESCRIPTION: Industrial Vision Pulse with Telemetry Uplink.
+ * CHANGE: Integrated MissionControlService to fix "Waiting for Neural Heartbeat".
  */
 
 import 'dart:async';
@@ -15,7 +15,11 @@ import 'package:http/http.dart' as http;
 import 'package:camera_macos/camera_macos.dart';
 import 'package:camera/camera.dart';
 
-// TODO: REPLACE '192.168.1.5' WITH YOUR MAC'S ACTUAL IP ADDRESS
+// Import Mission Control to report data
+import 'mission_control_service.dart';
+import '../models/telemetry_models.dart';
+
+// TODO: Ensure this IP matches your Mac's local IP (e.g. 192.168.1.x)
 const String _kServerUrl = "http://192.168.0.174:8000/v1/vision";
 
 class DetectionCandidate {
@@ -53,7 +57,6 @@ class VisionService {
 
   Future<void> _startWarmupAndLoop(String platform) async {
     debugPrint("flutter: SATYA_DEBUG: [VISION] $platform Camera attached. Starting warmup...");
-    // CRITICAL: Allow camera hardware to stabilize before taking pictures
     await Future.delayed(const Duration(seconds: 2));
     debugPrint("flutter: SATYA_DEBUG: [VISION] Warmup complete. Starting pulse loop.");
     _isRunning = true;
@@ -62,13 +65,10 @@ class VisionService {
 
   Future<void> _runLoop() async {
     while (_isRunning) {
-      // Check if EITHER controller is available and active
       bool canPulse = (macController != null || mobileController != null) && !isPaused && !_pulseActive;
-      
       if (canPulse) {
         await _performPulse();
       }
-      // Adaptive delay: slow down if camera is failing repeatedly
       final delay = _consecutiveFailures > 3 ? 2000 : 800;
       await Future.delayed(Duration(milliseconds: delay));
     }
@@ -77,47 +77,41 @@ class VisionService {
   Future<void> _performPulse() async {
     _pulseActive = true; 
     try {
-      // Attempt capture with retry logic
       Uint8List? imageBytes;
       
       for (int attempt = 0; attempt < 2; attempt++) {
         try {
           if (Platform.isMacOS && macController != null) {
-            // macOS Capture
             final CameraMacOSFile? rawData = await macController!.takePicture();
             if (rawData?.bytes != null && rawData!.bytes!.isNotEmpty) {
               imageBytes = Uint8List.fromList(rawData.bytes!);
             }
           } else if (mobileController != null && mobileController!.value.isInitialized) {
-            // iOS/Android Capture
             final XFile file = await mobileController!.takePicture();
             imageBytes = await file.readAsBytes();
           }
-
           if (imageBytes != null && imageBytes.isNotEmpty) break;
-
         } catch (captureError) {
-          debugPrint("flutter: SATYA_DEBUG: [VISION] Capture attempt $attempt failed: $captureError");
           if (attempt == 0) await Future.delayed(const Duration(milliseconds: 500));
         }
       }
       
       if (imageBytes == null) {
         _consecutiveFailures++;
-        if (_consecutiveFailures % 5 == 1) {
-          debugPrint("flutter: SATYA_DEBUG: [VISION] Camera capture failing. Failures: $_consecutiveFailures");
+        // Report error to Mission Control (low frequency)
+        if (_consecutiveFailures % 5 == 0) {
+           MissionControlService().record(MetricType.detectionCount, 0.0); // Keep heartbeat alive
         }
         return;
       }
       
-      _consecutiveFailures = 0; // Reset on success
+      _consecutiveFailures = 0;
 
-      // Use the local network IP instead of localhost
       final response = await http.post(
         Uri.parse(_kServerUrl),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({"images": [base64Encode(imageBytes)]})
-      ).timeout(const Duration(seconds: 5)); // Lower timeout for responsiveness
+      ).timeout(const Duration(seconds: 5));
       
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -134,10 +128,14 @@ class VisionService {
             ),
           );
         }).toList();
+        
         _candidatesController.add(candidates);
+        
+        // --- TELEMETRY UPLINK ---
+        // Report detection count to the Brain (Mission Control)
+        MissionControlService().record(MetricType.detectionCount, candidates.length.toDouble());
+        
         debugPrint("flutter: SATYA_DEBUG: [VISION] Detected ${candidates.length} objects.");
-      } else {
-         debugPrint("flutter: SATYA_DEBUG: [SERVER ERROR] ${response.statusCode}");
       }
     } catch (e) {
       debugPrint("flutter: VISION_STUTTER: $e");
