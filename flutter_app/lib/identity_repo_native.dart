@@ -1,8 +1,9 @@
 /**
  * FILE: flutter_app/lib/identity_repo_native.dart
- * VERSION: 1.9.4
+ * VERSION: 1.9.5
  * PHASE: Phase 8.2
  * PURPOSE: Implements History Fetching and FFI stability.
+ * CHANGES: Added static linking support for iOS (DynamicLibrary.process)
  */
 
 import 'identity_domain.dart';
@@ -16,9 +17,21 @@ class IdentityRepoNative implements IdentityRepository {
 
   bridge.RustCoreImpl get api {
     if (_api != null) return _api!;
-    final dl = Platform.isMacOS 
-      ? DynamicLibrary.open('librust_core.dylib') 
-      : DynamicLibrary.open('librust_core.so');
+    
+    final DynamicLibrary dl;
+    
+    if (Platform.isIOS) {
+      // iOS: The Rust library is statically linked into the Runner executable.
+      // We must use .process() to load symbols from the main process.
+      dl = DynamicLibrary.process();
+    } else if (Platform.isMacOS) {
+      // macOS: Loads from the separate dynamic library file.
+      dl = DynamicLibrary.open('librust_core.dylib');
+    } else {
+      // Android: Loads from the shared object file.
+      dl = DynamicLibrary.open('librust_core.so');
+    }
+
     _api = bridge.RustCoreImpl(dl);
     return _api!;
   }
