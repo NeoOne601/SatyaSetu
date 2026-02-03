@@ -179,3 +179,113 @@ pub fn rust_reset_vault(storage_path: String) -> Result<bool> {
 pub fn rust_calculate_spatial_cell(lat: f64, lng: f64) -> String {
     SpatialIndexer::calculate_cell_id(lat, lng)
 }
+
+// --- PHASE 13: NOSTR EVENT SIGNING API ---
+
+/// Signs an arbitrary JSON payload as a Nostr event.
+/// Used for decentralized verification, reviews, and trust broadcasts.
+/// 
+/// Event Kinds:
+/// - 1040: Ads (vendor promotions)
+/// - 1985: Reviews (user verifications)
+/// - 29001: Signed Intents (existing)
+/// 
+/// Returns the signed event JSON ready for relay broadcast.
+pub fn rust_sign_event(identity_id: String, event_kind: u16, payload_json: String) -> Result<String> {
+    let state = VAULT_STATE.lock().unwrap();
+    if let Some((_, vault, _, _)) = &*state {
+        let priv_key = vault.private_keys.get(&identity_id)
+            .ok_or_else(|| anyhow!("Identity not found: {}", identity_id))?;
+        
+        // Get the identity for DID tagging
+        let identity = vault.identities.iter()
+            .find(|i| i.id == identity_id)
+            .ok_or_else(|| anyhow!("Identity not found in vault"))?;
+        
+        // Create event using existing Nostr client keys derived from identity
+        let _guard = STATIC_RUNTIME.enter();
+        
+        // Derive Nostr keys from identity private key
+        let nostr_keys = STATIC_RUNTIME.block_on(async {
+            // Use identity key to derive Nostr-compatible keys
+            let key_hex = hex::encode(priv_key);
+            Keys::from_sk_str(&key_hex)
+        }).map_err(|e| anyhow!("Key derivation error: {}", e))?;
+        
+        // Build the Nostr event with the payload
+        let event = STATIC_RUNTIME.block_on(async {
+            // Add tags for DID and protocol metadata
+            let tags = vec![
+                Tag::Generic(nostr_sdk::prelude::TagKind::Custom("did".to_string()), vec![identity.did.clone()]),
+                Tag::Generic(nostr_sdk::prelude::TagKind::Custom("protocol".to_string()), vec!["satya-setu-v1".to_string()]),
+            ];
+            
+            EventBuilder::new(Kind::from(event_kind), payload_json.clone(), tags)
+                .to_event(&nostr_keys)
+        }).map_err(|e| anyhow!("Event creation error: {}", e))?;
+        
+        // Serialize the event to JSON
+        let event_json = serde_json::to_string(&event)?;
+        
+        Ok(event_json)
+    } else { 
+        Err(anyhow!("Vault Locked")) 
+    }
+}
+
+/// Publishes a pre-signed Nostr event to configured relays.
+/// Returns true if the event was successfully sent to at least one relay.
+pub fn rust_broadcast_event(signed_event_json: String) -> Result<bool> {
+    let client_lock = NOSTR_CLIENT.lock().unwrap();
+    if let Some(client) = &*client_lock {
+        let _guard = STATIC_RUNTIME.enter();
+        STATIC_RUNTIME.block_on(async {
+            // Parse the signed event
+            let event: nostr_sdk::prelude::Event = serde_json::from_str(&signed_event_json)
+                .map_err(|e| anyhow!("Invalid event JSON: {}", e))?;
+            
+            // Send to connected relays
+            client.send_event(event).await?;
+            Ok(true)
+        })
+    } else { 
+        Err(anyhow!("Network Client Not Initialized")) 
+    }
+}
+
+/// Subscribe to Nostr events matching a filter.
+/// Returns events matching the specified kinds and optional author pubkey.
+pub fn rust_subscribe_events(kinds: Vec<u16>, author_pubkey: Option<String>, limit: u32) -> Result<Vec<String>> {
+    let client_lock = NOSTR_CLIENT.lock().unwrap();
+    if let Some(client) = &*client_lock {
+        let _guard = STATIC_RUNTIME.enter();
+        STATIC_RUNTIME.block_on(async {
+            // Build filter
+            let mut filter = Filter::new()
+                .kinds(kinds.into_iter().map(Kind::from).collect::<Vec<_>>())
+                .limit(limit as usize);
+            
+            // Add author filter if specified
+            if let Some(pubkey) = author_pubkey {
+                if let Ok(pk) = nostr_sdk::prelude::PublicKey::from_hex(&pubkey) {
+                    filter = filter.author(pk);
+                }
+            }
+            
+            // Fetch events with timeout
+            let events = client.get_events_of(vec![filter], Some(Duration::from_secs(10))).await?;
+            
+            // Serialize events to JSON strings
+            let mut results = Vec::new();
+            for event in events {
+                if let Ok(json) = serde_json::to_string(&event) {
+                    results.push(json);
+                }
+            }
+            
+            Ok(results)
+        })
+    } else { 
+        Err(anyhow!("Network Client Not Initialized")) 
+    }
+}

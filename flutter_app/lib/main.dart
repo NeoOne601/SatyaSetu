@@ -1,9 +1,11 @@
 /**
  * FILE: flutter_app/lib/main.dart
- * VERSION: 84.3.0
+ * VERSION: 112.0.0
  * AUTHOR: SatyaSetu Principal Engineer
- * DESCRIPTION: Industrial Grade Trust Interface.
- * FIX: Implemented "Cover" scaling for CameraPreview to prevent stretching/distortion.
+ * PHASE: Phase 12 (Sovereign Commerce)
+ * DESCRIPTION: 
+ * Sovereign Spatial Marketplace Interface.
+ * Integrates Trust Graph, Reactive Drawer, and Commerce Engine.
  */
 
 import 'dart:convert';
@@ -19,11 +21,14 @@ import 'services/vision_service.dart';
 import 'services/hardware_id_service.dart';
 import 'services/intent_harvester.dart';
 import 'services/intent_engine.dart';
+import 'services/event_bus.dart';
+import 'services/commerce_service.dart';
 import 'identity_repo.dart';
 import 'models/intent_models.dart';
 
 import 'screens/radar_view.dart';
 import 'screens/mission_control_screen.dart';
+import 'widgets/sovereign_drawer.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -85,10 +90,17 @@ class _HomeScreenState extends State<HomeScreen> {
   List<DetectionCandidate> _candidates = [];
   CameraController? _mobileCameraController;
   bool _isMobileCameraReady = false;
+  DetectionCandidate? _selectedCandidate;
+  bool _isDrawerOpen = false;
+  
+  // Phase 12: Commerce and Event services
+  final CommerceService _commerce = CommerceService();
+  final EventBus _eventBus = EventBus();
   
   @override void initState() {
     super.initState();
     widget.visionService.initialize();
+    _commerce.initialize();
     widget.visionService.candidatesStream.listen((c) { if (mounted) setState(() => _candidates = c); });
     
     if (!Platform.isMacOS) {
@@ -129,6 +141,28 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
+  /// Phase 12: Open Sovereign Drawer for commerce discovery
+  void _openSovereignDrawer(DetectionCandidate candidate) {
+    // Emit event for commerce service
+    _eventBus.emit(SatyaEventType.objectSelected, ObjectSelectedPayload(
+      candidate: candidate,
+      screenPosition: Offset.zero,
+    ));
+    
+    setState(() {
+      _selectedCandidate = candidate;
+      _isDrawerOpen = true;
+    });
+  }
+  
+  void _closeSovereignDrawer() {
+    setState(() {
+      _selectedCandidate = null;
+      _isDrawerOpen = false;
+    });
+  }
+
+  /// Legacy: Show Intent Card for fallback affordance modal
   void _showIntentCard(DetectionCandidate candidate) {
     widget.visionService.isPaused = true;
     showModalBottomSheet(
@@ -182,15 +216,16 @@ class _HomeScreenState extends State<HomeScreen> {
           // LAYER 1: PLATFORM AWARE CAMERA
           Positioned.fill(
             child: Opacity(
-              opacity: 0.6, // Increased opacity slightly for better visibility
+              opacity: _isDrawerOpen ? 0.3 : 0.6, // Dim when drawer is open
               child: Platform.isMacOS 
                 ? CameraMacOSView(cameraMode: CameraMacOSMode.photo, onCameraInizialized: (c) => widget.visionService.attachCamera(c))
                 : _buildMobileCameraPreview(constraints)
             )
           ),
           
-          // LAYER 2: AUGMENTED REALITY OVERLAYS
-          ..._candidates.map((c) => _buildMorphicTile(c, constraints.maxWidth, constraints.maxHeight)),
+          // LAYER 2: AUGMENTED REALITY OVERLAYS (hidden when drawer open)
+          if (!_isDrawerOpen)
+            ..._candidates.map((c) => _buildMorphicTile(c, constraints.maxWidth, constraints.maxHeight)),
           
           // LAYER 3: HUD TOP
           Positioned(
@@ -200,7 +235,7 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   const Text("SATYA SETU", style: TextStyle(letterSpacing: 4, fontSize: 18, fontWeight: FontWeight.w900, color: Color(0xFF00FFC8))),
-                  const Text("RECOVERY HUB ACTIVE", style: TextStyle(fontSize: 8, color: Colors.white38)),
+                  Text(_isDrawerOpen ? "MARKETPLACE ACTIVE" : "SPATIAL SCANNER", style: const TextStyle(fontSize: 8, color: Colors.white38)),
                 ]),
                 IconButton(
                   onPressed: _openMissionControl,
@@ -211,18 +246,31 @@ class _HomeScreenState extends State<HomeScreen> {
             )
           ),
 
-          // LAYER 4: HUD BOTTOM (RADAR)
-          Positioned(
-            bottom: 30, right: 20, 
-            child: SizedBox(width: 100, height: 100, child: RadarView(candidates: _candidates))
-          ),
+          // LAYER 4: HUD BOTTOM (RADAR) - hidden when drawer open
+          if (!_isDrawerOpen)
+            Positioned(
+              bottom: 30, right: 20, 
+              child: SizedBox(width: 100, height: 100, child: RadarView(candidates: _candidates))
+            ),
+          
+          // LAYER 5: SOVEREIGN DRAWER (Phase 12)
+          if (_isDrawerOpen && _selectedCandidate != null)
+            Positioned.fill(
+              child: SovereignDrawer(
+                candidate: _selectedCandidate!,
+                visionService: widget.visionService,
+                onClose: _closeSovereignDrawer,
+              ),
+            ),
         ]);
       }),
     );
   }
 
   Widget _buildMorphicTile(DetectionCandidate c, double screenW, double screenH) {
-    final Color baseColor = IntentEngine.generateVibrantColor(c.objectLabel); 
+    // Phase 11: Use trust-based colors from Trust Graph
+    final Color baseColor = TrustColors.forScore(c.trustScore);
+    
     return AnimatedPositioned(
       duration: const Duration(milliseconds: 300),
       left: (c.relativeLocation.left * screenW).clamp(0, screenW - 50),
@@ -230,10 +278,46 @@ class _HomeScreenState extends State<HomeScreen> {
       width: (c.relativeLocation.width * screenW).clamp(45.0, screenW),
       height: (c.relativeLocation.height * screenH).clamp(35.0, screenH),
       child: GestureDetector(
-        onTap: () => _showIntentCard(c),
+        onTap: () => _openSovereignDrawer(c), // Phase 12: Open Sovereign Drawer
+        onLongPress: () => _showIntentCard(c), // Legacy affordance modal
         child: Container(
-          decoration: BoxDecoration(color: baseColor.withOpacity(0.1), border: Border.all(color: baseColor.withOpacity(0.8), width: 1.0), borderRadius: BorderRadius.circular(8)),
-          child: Column(mainAxisAlignment: MainAxisAlignment.end, children: [Container(width: double.infinity, padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 4), decoration: BoxDecoration(color: baseColor.withOpacity(0.85), borderRadius: const BorderRadius.vertical(bottom: Radius.circular(6))), child: Center(child: Text(c.objectLabel, style: const TextStyle(fontSize: 6.5, fontWeight: FontWeight.bold, color: Colors.black), overflow: TextOverflow.ellipsis)))]),
+          decoration: BoxDecoration(
+            color: baseColor.withOpacity(0.1), 
+            border: Border.all(color: baseColor.withOpacity(0.8), width: 1.0), 
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.end, 
+            children: [
+              Container(
+                width: double.infinity, 
+                padding: const EdgeInsets.symmetric(vertical: 2, horizontal: 4), 
+                decoration: BoxDecoration(
+                  color: baseColor.withOpacity(0.85), 
+                  borderRadius: const BorderRadius.vertical(bottom: Radius.circular(6)),
+                ), 
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    // Trust indicator
+                    Icon(
+                      c.isTrusted ? LucideIcons.shieldCheck : LucideIcons.shield,
+                      size: 8,
+                      color: Colors.black,
+                    ),
+                    const SizedBox(width: 2),
+                    Flexible(
+                      child: Text(
+                        c.objectLabel, 
+                        style: const TextStyle(fontSize: 6.5, fontWeight: FontWeight.bold, color: Colors.black), 
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

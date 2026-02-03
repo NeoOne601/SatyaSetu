@@ -1,14 +1,18 @@
 # FILE: flutter_app/pubspec.yaml
-# VERSION: 1.8.4
-# PHASE: Phase 8.4 (AI Native Adaptation)
+# VERSION: 1.15.0
+# PHASE: Phases 11-15 (Sovereign Marketplace Complete)
 # DESCRIPTION: 
-# Adds network capabilities for dynamic AI semantic mapping via Gemini.
-# Maintains ML Kit and Camera baselines for mobile vision.
+# Complete Sovereign Spatial Marketplace with:
+# - Local Trust Graph persistence (SQLite)
+# - Commerce UI with Reactive Drawer
+# - Nostr Protocol integration
+# - Backend microservices support
+# - Performance optimizations (image compression)
 
 name: flutter_app
-description: "SatyaSetu: Privacy-First Identity Bridge"
+description: "SatyaSetu: Sovereign Spatial Marketplace"
 publish_to: 'none'
-version: 1.8.4+1
+version: 1.15.0+1
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -31,6 +35,11 @@ dependencies:
   device_info_plus: ^10.1.0
   mobile_scanner: ^7.1.4
   permission_handler: ^11.3.1
+
+  # --- PHASE 11: LOCAL CORTEX (SQLite) ---
+  sqflite: ^2.3.0
+  path: ^1.8.3
+  uuid: ^4.2.1
 
   # --- PHASE 7/8: SMART VISION & AI BRAIN ---
   camera: ^0.11.0+2

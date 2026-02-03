@@ -1,8 +1,8 @@
 /**
  * FILE: flutter_app/lib/identity_repo.dart
- * VERSION: 1.9.4
- * PHASE: Phase 8.2
- * GOAL: Maintain the Proof Fetching contract for decentralized history.
+ * VERSION: 1.13.0
+ * PHASE: Phase 13 (Nostr Protocol Integration)
+ * GOAL: Defines the contract for identity and Nostr operations.
  */
 
 import 'identity_domain.dart';
@@ -19,6 +19,11 @@ abstract class IdentityRepository {
   Future<bool> publishToNostr(String signedJson);
   Future<bool> resetVault(String path);
   Future<List<String>> fetchInteractionHistory();
+  
+  // Phase 13: Nostr Event Signing
+  Future<String> signEvent(String identityId, int eventKind, String payloadJson);
+  Future<bool> broadcastEvent(String signedEventJson);
+  Future<List<String>> subscribeEvents(List<int> kinds, {String? authorPubkey, int limit = 20});
 
   factory IdentityRepository() => getIdentityRepository();
 }

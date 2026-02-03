@@ -1,9 +1,9 @@
 /**
  * FILE: flutter_app/lib/identity_repo_native.dart
- * VERSION: 1.9.5
- * PHASE: Phase 8.2
- * PURPOSE: Implements History Fetching and FFI stability.
- * CHANGES: Added static linking support for iOS (DynamicLibrary.process)
+ * VERSION: 1.13.0
+ * PHASE: Phase 13 (Nostr Protocol Integration)
+ * PURPOSE: Implements Nostr event signing and broadcast via Rust FFI.
+ * CHANGES: Added signEvent, broadcastEvent, subscribeEvents methods.
  */
 
 import 'identity_domain.dart';
@@ -50,6 +50,29 @@ class IdentityRepoNative implements IdentityRepository {
   @override Future<String> signIntent(i, u) => api.rustSignIntent(identityId: i, upiUrl: u);
   @override Future<bool> publishToNostr(s) => api.rustPublishToNostr(signedJson: s);
   @override Future<List<String>> fetchInteractionHistory() => api.rustFetchInteractionHistory();
+  
+  // --- PHASE 13: NOSTR EVENT SIGNING ---
+  
+  /// Sign an arbitrary payload as a Nostr event
+  /// [identityId] - The identity to sign with
+  /// [eventKind] - Nostr event kind (1040=Ads, 1985=Reviews, 29001=Intents)
+  /// [payloadJson] - The JSON payload to sign
+  @override
+  Future<String> signEvent(String identityId, int eventKind, String payloadJson) => 
+    api.rustSignEvent(identityId: identityId, eventKind: eventKind, payloadJson: payloadJson);
+  
+  /// Broadcast a pre-signed event to Nostr relays
+  @override
+  Future<bool> broadcastEvent(String signedEventJson) => 
+    api.rustBroadcastEvent(signedEventJson: signedEventJson);
+  
+  /// Subscribe to Nostr events matching criteria
+  /// [kinds] - List of event kinds to filter
+  /// [authorPubkey] - Optional author public key filter
+  /// [limit] - Maximum number of events to return
+  @override
+  Future<List<String>> subscribeEvents(List<int> kinds, {String? authorPubkey, int limit = 20}) => 
+    api.rustSubscribeEvents(kinds: kinds.map((k) => k).toList(), authorPubkey: authorPubkey, limit: limit);
 }
 
 IdentityRepository getIdentityRepository() => IdentityRepoNative();
