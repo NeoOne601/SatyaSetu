@@ -1,15 +1,63 @@
-# 🔐 SatyaSetu - Privacy-First Decentralized Identity Bridge
+# 🔐 SatyaSetu - Sovereign Spatial Marketplace
 
 <div align="center">
 
-**A revolutionary cross-platform identity management system combining on-device AI vision, cryptographic proof generation, and decentralized social protocols.**
+**A privacy-first, decentralized spatial marketplace that transforms your camera into a Trust Sensor for discovering, verifying, and transacting with physical objects and vendors in your environment.**
 
-![Version](https://img.shields.io/badge/version-2.0.0-blue)
-![Phase](https://img.shields.io/badge/phase-69.1-green)
+![Version](https://img.shields.io/badge/version-1.15.0-blue)
+![Phase](https://img.shields.io/badge/phase-Phase%2015-green)
 ![Platform](https://img.shields.io/badge/platform-iOS%20%7C%20Android%20%7C%20macOS-lightgrey)
 ![License](https://img.shields.io/badge/license-Private-red)
 
 </div>
+
+---
+
+## 🔄 Before & After: Phase 11-15 Transformation
+
+### What Changed on February 3, 2026
+
+| Aspect | Before (Phase 1-10) | After (Phase 11-15) |
+|--------|---------------------|---------------------|
+| **Local Data** | Memory-only (ephemeral) | SQLite Trust Graph (persistent) |
+| **Object Status** | No trust indicator | Trust score 0-100% with color coding |
+| **Commerce** | None | Full marketplace with Reactive Drawer |
+| **Verification** | Local only | Nostr broadcast to decentralized relays |
+| **Backend** | None | PostgreSQL + Redis + FastAPI |
+| **Network** | Image upload (full size) | Compressed (640px, 75% JPEG) |
+| **UI on Tap** | Simple modal | Sovereign Drawer (Peek 40% / Market 90%) |
+| **Ad Ranking** | N/A | Sovereign Ad Logic algorithm |
+
+### Architecture Evolution
+
+**Before (AR Viewer):**
+```
+Camera → AI Vision → Detection Boxes → Simple Modal
+```
+
+**After (Spatial Marketplace):**
+```
+Camera → AI Vision → Trust Graph Enrichment → Trust-Colored Overlays
+    ↓
+Tap Object → Sovereign Drawer (Peek/Market)
+    ↓
+Verified Tab ↔ Global Tab ↔ Bounties Tab
+    ↓
+Verify/Report → Nostr Broadcast → Trust Score Update
+```
+
+### New Files Added
+
+| File | Purpose |
+|------|--------|
+| `database_service.dart` | SQLite Trust Graph (entities, interactions, cache) |
+| `event_bus.dart` | Decoupled pub/sub communication |
+| `commerce_service.dart` | Marketplace logic with Sovereign Ad Logic |
+| `nostr_service.dart` | High-level Nostr event signing/broadcast |
+| `sovereign_drawer.dart` | Reactive Drawer commerce UI |
+| `docker-compose.yml` | PostgreSQL + Redis + FastAPI infrastructure |
+| `backend/db/init.sql` | Database schema with ranking functions |
+| `backend/search_api/main.py` | FastAPI search microservice |
 
 ---
 
@@ -64,37 +112,37 @@ SatyaSetu operates on three fundamental principles:
 
 ## 🏗️ System Architecture
 
-SatyaSetu is built on a **hybrid Flutter-Rust architecture** with three distinct layers:
+SatyaSetu is built on a **hybrid Flutter-Rust architecture** with five distinct layers:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                    PRESENTATION LAYER                        │
 │              (Flutter - Dart Multi-Platform UI)              │
-│  • Identity Lens (AI Vision with Semantic Reticles)          │
+│  • Identity Lens (AI Vision with Trust-Colored Reticles)     │
+│  • Sovereign Drawer (Reactive Commerce Interface)            │
 │  • Proof Ledger (Interaction History)                        │
-│  • Setup & Configuration                                     │
 └─────────────────────────────────────────────────────────────┘
                             │
                             ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                   APPLICATION LAYER                          │
 │         (Dart Services + FFI Bridge to Rust Core)            │
-│  • VisionService: On-device AI scene analysis (v83.0)        │
-│  • IntentEngine: Dual-tier interaction paradigm (v4.1)       │
-│  • MissionControl: System telemetry & observability (v1.6)   │
-│  • IntentHarvester: Cryptographic ledger management          │
-│  • VaultService: Encrypted storage management                │
-│  • HardwareIDService: Device entropy extraction              │
-│  • IdentityRepo: Multi-identity state management            │
+│  • VisionService: On-device AI scene analysis (v111.0)       │
+│  • DatabaseService: SQLite Trust Graph persistence           │
+│  • CommerceService: Marketplace logic + Sovereign Ad Logic   │
+│  • EventBus: Decoupled pub/sub communication                 │
+│  • NostrService: Decentralized verification broadcast        │
+│  • IntentEngine: Dual-tier interaction paradigm              │
+│  • MissionControl: System telemetry & observability          │
 └─────────────────────────────────────────────────────────────┘
                             │
                             ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                     CORE LAYER (Rust)                        │
 │  • Cryptography: Ed25519, Argon2, ChaCha20-Poly1305          │
-│  • Persistence: SQLite with encrypted vaults                 │
-│  • Nostr SDK: Event signing and relay broadcasting           │
+│  • Nostr SDK: Event signing, broadcasting, subscription      │
 │  • Parsers: UPI QR code semantic extraction                  │
+│  • Spatial: S2/Geohash indexing                              │
 └─────────────────────────────────────────────────────────────┘
                             │
                             ▼
@@ -103,6 +151,16 @@ SatyaSetu is built on a **hybrid Flutter-Rust architecture** with three distinct
 │  • Apple Vision Server: Local Python inference server        │
 │  • Florence-2 VLM: Dense region captioning                   │
 │  • Nostr Relays: wss://relay.damus.io, relay.nostr.band     │
+└─────────────────────────────────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│                   BACKEND LAYER (Phase 14)                   │
+│  • PostgreSQL: Vendors, products, ads, verifications         │
+│  • PostGIS: Spatial queries for location-based search        │
+│  • pgvector: Semantic search with embeddings                 │
+│  • Redis: Caching and pub/sub                                │
+│  • FastAPI: Search API with Sovereign Ad Logic               │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -130,126 +188,78 @@ Vision Resume → Reactive Heartbeat Continues
 
 ## ✨ Core Features
 
-### 1. **Identity Lens** - Real-Time AI Vision
+### 1. **Trust Graph** - Local Persistence (Phase 11)
 
-- **On-Device Florence-2 Vision Model**: Microsoft's state-of-the-art vision-language model runs locally via Apple Silicon GPU acceleration
-- **Semantic Object Classification**: Automatically distinguishes living beings (red reticles) from inanimate objects (cyan reticles)
-- **Dense Region Captioning**: Multi-object detection with precise bounding box localization
-- **Thermal Management**: Intelligent frame throttling (2.5s intervals) prevents M1 thermal throttling
-- **Zero Cloud Dependency**: All inference happens on-device for complete privacy
+- **SQLite Cortex**: Persistent local database for offline-first operation
+- **Entity Memory**: Remembers detected objects with geohash and trust scores
+- **Interaction Ledger**: Records VERIFY, RATE, BUY, REPORT actions
+- **Product Cache**: Offline marketplace results with TTL expiration
+- **Trust Score Evolution**: 0.0-1.0 score based on community verifications
 
-**Technical Specifications:**
-- Model: `microsoft/Florence-2-base` (232M parameters)
-- Hardware: Apple MPS (Metal Performance Shaders) backend
-- Inference Time: ~2-3s per frame on M1
-- Detection Precision: Normalized coordinates (0-1000 scale)
-
-### 2. **Hierarchical Deterministic Identity System**
-
-- **Hardware-Bound Entropy**: Device-specific identifiers seed the root key derivation
-- **PIN-Protected Vault**: User PIN + Hardware ID → Argon2 KDF → ChaCha20-Poly1305 encryption
-- **Multi-Identity Support**: BIP32-like hierarchical derivation for unlimited personas
-- **Ed25519 Signatures**: 256-bit elliptic curve cryptography for quantum-resistant signing
-
-**Identity Derivation Chain:**
+**Trust Score Logic:**
 ```
-Hardware ID + User PIN
-    ↓ (Argon2 KDF)
-Master Seed (256-bit)
-    ↓ (HMAC-SHA512)
-Identity #1, Identity #2, ..., Identity #N
-    ↓
-Ed25519 Keypairs (signing + verification)
+VERIFY → +0.1 trust
+RATE (5★) → +0.15 trust
+RATE (1★) → -0.15 trust
+REPORT → -0.2 trust
 ```
 
-### 3. **Intent Engine** - Dual-Tier Interaction Paradigm
+### 2. **Sovereign Drawer** - Commerce UI (Phase 12)
 
-- **"2+3" Choice Separation Architecture**: Combines instant heuristic choices with async LLM-powered deep inquiries
-- **Tier 1 - Florence Heuristic (0ms)**: Two immediate interaction choices generated from standardized heuristic map
-- **Tier 2 - Gemma Inquiries (~12s)**: Three contextual questions synthesized by local Gemma LLM
-- **Spectral Color Generation**: HSV-based vibrant color assignment for visual object differentiation
-- **Zero Latency Trust**: Instant choices appear immediately when user taps detected object
+- **Reactive Drawer**: DraggableScrollableSheet with snap points (40%/90%)
+- **Peek State (40%)**: Object title, trust badge, quick Verify/Report actions
+- **Market State (90%)**: Tabbed ListView (Verified, Global, Bounties)
+- **Trust-Colored UI**: Green (trusted), Gold (promoted), Red (untrusted), Blue (bounty)
+- **EventBus Architecture**: Decoupled pub/sub for vision ↔ commerce communication
 
-**Technical Specifications:**
-- Heuristic Engine: Standardized choice templates for instant response
-- LLM Backend: Google Gemma (local inference via Python server)
-- Color Space: HSV (0.8 saturation, 0.95 value) for maximum vibrancy
-- Timeout: 15s for Gemma reasoning with graceful fallback
-
-**Interaction Flow:**
+**Sovereign Ad Logic:**
 ```
-User Taps Object → Vision Pauses → Intent Card Opens
-    ↓
-Tier 1: "Visual Ground Truth" + "Market Snapshot" (Instant)
-    ↓
-Tier 2: Gemma generates 3 contextual questions (Async)
-    ↓
-User Selects Choice → Intent Harvester Records → Vision Resumes
+Score = (Bid × AdvertiserTrust) + (OrganicRelevance × SocialProximity)
 ```
 
-### 4. **Mission Control Telemetry System**
+### 3. **Nostr Protocol** - Decentralized Verification (Phase 13)
 
-- **Real-Time System Observability**: Stream-based telemetry for application health monitoring
-- **Detection Count Tracking**: Cumulative object detection metrics across all vision pulses
-- **Memory-Efficient Recording**: Simplified pulse recording without latency buffers
-- **Broadcast Stream Distribution**: SystemHealth events streamed to UI for live status display
-- **Singleton Architecture**: Single instance ensures consistent state across application
+- **Event Signing**: Rust FFI for cryptographic Nostr event creation
+- **Relay Broadcasting**: Multi-relay distribution (Damus, Nostr.band)
+- **Subscription Queries**: Fetch reviews/verifications by entity or author
+- **DID Tagging**: Events tagged with `did:satya:` identifiers
 
-**Telemetry Metrics:**
-- Detection Count: Cumulative objects detected since app launch
-- Average Latency: Vision inference timing (streamlined in v1.6.0)
-- Error Percentage: Failed request tracking
-- Top Intents: Most frequently harvested interaction types
+**Event Kinds:**
+| Kind | Purpose |
+|------|--------|
+| 1040 | Vendor Ads |
+| 1985 | User Reviews/Verifications |
+| 29001 | Signed Intents |
+| 29002 | Trust Updates |
 
-### 5. **Intent Harvester** - Cryptographic Ledger
+### 4. **Backend Microservices** (Phase 14)
 
-- **Interaction Proof Recording**: Captures user choices with cryptographic signatures
-- **Ed25519 Digital Signatures**: Each harvested intent signed with active identity
-- **SQLite Persistence**: Local-first storage with Nostr relay synchronization
-- **Situational Context Tagging**: Global, trade, education, finance, domestic categorization
-- **Confidence Scores**: 0-100 ranking for intent certainty
+- **PostgreSQL + PostGIS**: Spatial queries for location-based search
+- **pgvector Extension**: Semantic search with 384-dim embeddings
+- **Redis Caching**: 1-hour TTL for search results
+- **FastAPI Search API**: `/v1/search`, `/v1/bounties`, `/v1/verification`
+- **Docker Compose**: One-command infrastructure deployment
 
-**Harvest Structure:**
-```json
-{
-  "object": "LAPTOP",
-  "interaction": "Visual Ground Truth",
-  "context": "global",
-  "signature": "7a9f2c...",
-  "timestamp": "2026-01-06T13:26:25Z",
-  "confidence": 10
-}
-```
+### 5. **Identity Lens** - Real-Time AI Vision
 
-### 6. **QR Code Transaction Proof System**
+- **On-Device Florence-2 Vision Model**: Microsoft's vision-language model
+- **Trust-Colored Reticles**: Objects colored by trust score (green/gray/red)
+- **Image Compression**: 640px max width, 75% JPEG quality (Phase 15)
+- **Dense Region Captioning**: Multi-object detection with bounding boxes
+- **Zero Cloud Dependency**: All inference happens on-device
 
-- **UPI Intent Parsing**: Regex-based extraction of payment metadata (VPA, amount, merchant)
-- **Cryptographic Signing**: Ed25519 signature over `{identity_did, upi_intent, timestamp, nonce}`
-- **Nostr Event Broadcasting**: Signed proofs published as Kind-1 events to decentralized relays
-- **Interaction History**: Local SQLite persistence + global Nostr synchronization
+### 6. **Hierarchical Deterministic Identity System**
 
-**Proof Structure:**
-```json
-{
-  "identity": "did:satya:03a2f8b4...",
-  "intent": {
-    "vpa": "merchant@bank",
-    "name": "Acme Corp",
-    "amount": "500",
-    "currency": "INR"
-  },
-  "signature": "A89BC3F2D...",
-  "timestamp": "2026-01-01T01:49:12Z",
-  "nonce": "7f3a19c2..."
-}
-```
+- **Hardware-Bound Entropy**: Device-specific identifiers seed the root key
+- **PIN-Protected Vault**: User PIN + Hardware ID → Argon2 KDF → ChaCha20 encryption
+- **Multi-Identity Support**: BIP32-like hierarchical derivation
+- **Ed25519 Signatures**: Quantum-resistant signing
 
-### 7. **Decentralized Proof Ledger**
+### 7. **QR Code Transaction Proof System**
 
-- **Nostr Protocol Integration**: Leverages censorship-resistant social protocol for proof distribution
-- **Relay Pool**: Multi-relay broadcasting (Damus, Nostr.band) ensures redundancy
-- **Event Verification**: All proofs cryptographically verifiable via public keys (DIDs)
-- **Offline-First**: Local SQLite acts as source of truth; network is sync layer
+- **UPI Intent Parsing**: Regex extraction of payment metadata
+- **Cryptographic Signing**: Ed25519 signature over transaction data
+- **Nostr Broadcasting**: Signed proofs published to decentralized relays
 
 ---
 
@@ -309,49 +319,57 @@ SatyaSetu_Internal/
 │
 ├── flutter_app/                    # Flutter mobile/desktop application
 │   ├── lib/
-│   │   ├── main.dart              # Main app entry + UI (v60.0.0)
+│   │   ├── main.dart              # Main app entry + UI (v112.0.0)
 │   │   ├── identity_domain.dart   # Core domain models
-│   │   ├── identity_repo.dart     # Abstract repository interface
+│   │   ├── identity_repo.dart     # Abstract repository interface (v1.13.0)
 │   │   ├── identity_repo_native.dart # Native Rust FFI implementation
 │   │   ├── bridge_generated.dart  # Auto-generated FFI bindings
 │   │   ├── services/
-│   │   │   ├── vision_service.dart           # AI vision orchestration (v83.0)
-│   │   │   ├── intent_engine.dart            # Dual-tier interaction paradigm (v4.1)
-│   │   │   ├── mission_control_service.dart  # System telemetry (v1.6)
+│   │   │   ├── vision_service.dart           # AI vision orchestration (v111.0)
+│   │   │   ├── database_service.dart         # SQLite Trust Graph (NEW)
+│   │   │   ├── event_bus.dart                # Pub/sub communication (NEW)
+│   │   │   ├── commerce_service.dart         # Marketplace logic (NEW)
+│   │   │   ├── nostr_service.dart            # Nostr event handling (NEW)
+│   │   │   ├── intent_engine.dart            # Dual-tier interaction paradigm
+│   │   │   ├── mission_control_service.dart  # System telemetry
 │   │   │   ├── intent_harvester.dart         # Cryptographic ledger
 │   │   │   ├── vault_service.dart            # Encrypted storage
 │   │   │   └── hardware_id_service.dart      # Device fingerprinting
-│   │   ├── models/
-│   │   │   ├── intent_models.dart            # MorphicAction, SituationState
-│   │   │   └── telemetry_models.dart         # SystemPulse, SystemHealth
-│   │   └── ...
+│   │   ├── widgets/
+│   │   │   └── sovereign_drawer.dart         # Reactive Drawer UI (NEW)
+│   │   └── models/
+│   │       ├── intent_models.dart            # MorphicAction, SituationState
+│   │       └── telemetry_models.dart         # SystemPulse, SystemHealth
 │   ├── ios/                       # iOS-specific configuration
 │   ├── android/                   # Android-specific configuration
 │   ├── macos/                     # macOS-specific configuration
-│   └── pubspec.yaml               # Flutter dependencies
+│   └── pubspec.yaml               # Flutter dependencies (v1.15.0)
 │
 ├── rust_core/                     # Rust cryptographic core
 │   ├── src/
 │   │   ├── lib.rs                 # Library entry point
-│   │   ├── api.rs                 # Public FFI API exposed to Dart
+│   │   ├── api.rs                 # Public FFI API (Phase 13 additions)
 │   │   ├── crypto.rs              # Ed25519, Argon2, ChaCha20
 │   │   ├── domain.rs              # Core domain types
 │   │   ├── persistence.rs         # SQLite vault management
 │   │   ├── parser.rs              # UPI QR parsing logic
-│   │   ├── service.rs             # Business logic services
-│   │   ├── telemetry.rs           # Logging and diagnostics
+│   │   ├── spatial.rs             # S2/Geohash indexing
 │   │   └── bridge_generated.rs    # Auto-generated FFI bridge
 │   └── Cargo.toml                 # Rust dependencies
 │
-├── apple_vision_server.py         # Local AI vision inference server
-├── vision_config.json              # Vision model configuration (gitignored)
-├── apple_vlm_weights/              # Florence-2 model weights (gitignored)
-├── yolov8s-worldv2.pt              # Backup YOLO model (gitignored)
+├── backend/                       # Backend Microservices (NEW)
+│   ├── db/
+│   │   └── init.sql               # PostgreSQL schema
+│   └── search_api/
+│       ├── main.py                # FastAPI search service
+│       ├── Dockerfile             # Container configuration
+│       └── requirements.txt       # Python dependencies
 │
-├── build_mobile.sh                 # Cross-platform build orchestrator
-├── migration_protocol.sh           # Database migration helper
-├── .gitignore                      # Git exclusions (models, binaries)
-└── README.md                       # This file
+├── docker-compose.yml             # Infrastructure orchestration (NEW)
+├── apple_vision_server.py         # Local AI vision inference server
+├── build_mobile.sh                # Cross-platform build orchestrator
+├── WALKTHROUGH_Phases_11-15.md    # Implementation documentation (NEW)
+└── README.md                      # This file
 ```
 
 ### Key Configuration Files
@@ -1060,39 +1078,37 @@ rustup update
 
 ## 🗺️ Roadmap
 
-### ✅ Completed (Phase 1-69)
+### ✅ Completed (Phase 1-15)
 - [x] Hierarchical deterministic identity system with Ed25519
 - [x] On-device Florence-2 vision with semantic object detection
 - [x] Reactive heartbeat architecture with pause control
 - [x] Dual-tier interaction paradigm (Florence + Gemma)
 - [x] Mission Control telemetry and observability
 - [x] Intent Harvester cryptographic ledger
-- [x] Spectral color generation for visual differentiation
-- [x] Memory-efficient sequential request-response cycle
+- [x] **Phase 11: SQLite Trust Graph (entities, interactions, cache)**
+- [x] **Phase 12: Sovereign Drawer commerce UI with EventBus**
+- [x] **Phase 13: Nostr event signing/broadcasting via Rust FFI**
+- [x] **Phase 14: PostgreSQL + Redis + FastAPI backend**
+- [x] **Phase 15: Image compression optimization**
 
-### Phase 70+ (Q1 2026) - Advanced Reasoning
-- [ ] Multi-modal context fusion (vision + audio + location)
-- [ ] Persistent knowledge graph for learned interactions
-- [ ] Federated learning for intent pattern recognition
-- [ ] Real-time intent prediction before user action
+### Phase 16-20 (Q1 2026) - Production Hardening
+- [ ] GST verification API integration
+- [ ] UPI payment gateway integration
+- [ ] Production Nostr relay deployment
+- [ ] Trust graph aggregation algorithms
+- [ ] Vendor onboarding portal
 
-### Phase 75+ (Q2 2026) - Cross-Device Sync
-- [ ] Encrypted cloud backup (user-controlled keys)
-- [ ] Multi-device identity sync via Nostr
-- [ ] Recovery protocol (social key sharding)
-- [ ] Peer-to-peer proof verification network
+### Phase 21-25 (Q2 2026) - Scale & Federation
+- [ ] Multi-relay trust consensus
+- [ ] Regional geofencing for marketplace
+- [ ] Federated search across relay networks
+- [ ] Advanced fraud detection ML
 
-### Phase 80+ (Q3 2026) - Ecosystem Integration
-- [ ] Browser extension for web DID authentication
-- [ ] OAuth2/OIDC provider for existing apps
-- [ ] Merchant SDK for proof verification
-- [ ] API for third-party intent harvesting
-
-### Phase 85+ (Q4 2026) - Privacy Enhancements
+### Phase 26-30 (Q3 2026) - Privacy Enhancements
 - [ ] Zero-knowledge proofs for selective disclosure
-- [ ] Homomorphic encryption for encrypted computation
+- [ ] Encrypted computation for trust scores
 - [ ] Onion routing for relay anonymity
-- [ ] Quantum-resistant signature scheme migration
+- [ ] Quantum-resistant signature migration
 
 ---
 
@@ -1167,5 +1183,5 @@ For internal support, contact the development team via:
 
 **Built with ❤️ for a decentralized future.**
 
-*Last Updated: January 6, 2026*  
-*Version: 2.0.0 (Phase 69.1 - Reactive Heartbeat Architecture & Memory-Efficient AI Integration)*
+*Last Updated: February 3, 2026*  
+*Version: 1.15.0 (Phase 15 - Sovereign Spatial Marketplace Complete)*
