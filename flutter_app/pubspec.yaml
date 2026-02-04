@@ -12,7 +12,7 @@
 name: flutter_app
 description: "SatyaSetu: Sovereign Spatial Marketplace"
 publish_to: 'none'
-version: 1.15.0+1
+version: 1.16.0+1
 
 environment:
   sdk: '>=3.0.0 <4.0.0'

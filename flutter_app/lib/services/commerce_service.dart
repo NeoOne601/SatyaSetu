@@ -1,11 +1,14 @@
 /**
  * FILE: flutter_app/lib/services/commerce_service.dart
- * VERSION: 1.0.0
- * PHASE: Phase 12 (Sovereign Commerce)
+ * VERSION: 2.0.0
+ * PHASE: Phase 12 (Sovereign Commerce) - Enhanced
  * DESCRIPTION: 
- * Marketplace logic with local-first strategy.
- * Listens to EventBus for object selection and fetches ranked products.
+ * Marketplace logic with local-first strategy and Cold Start Bounty Protocol.
  * Implements Sovereign Ad Logic: Score = (Bid * AdvertiserTrust) + (OrganicRelevance * SocialProximity)
+ * ENHANCEMENTS:
+ * - Mock data for development mode
+ * - Cold Start Bounty Protocol for unindexed entities
+ * - Social proximity from trust graph
  */
 
 import 'dart:async';
@@ -15,7 +18,6 @@ import 'package:http/http.dart' as http;
 
 import 'database_service.dart';
 import 'event_bus.dart';
-import 'vision_service.dart';
 
 /// Product from marketplace search results
 class MarketplaceProduct {
@@ -31,6 +33,7 @@ class MarketplaceProduct {
   final bool isSponsored;         // Is a paid promotion
   final bool isVerified;          // Vendor is GST verified
   final double rank;              // Calculated rank score
+  final bool isBounty;            // Cold Start Bounty item
   
   MarketplaceProduct({
     required this.productId,
@@ -45,6 +48,7 @@ class MarketplaceProduct {
     this.isSponsored = false,
     this.isVerified = false,
     required this.rank,
+    this.isBounty = false,
   });
   
   /// Format price in INR with symbol
@@ -75,6 +79,7 @@ class MarketplaceProduct {
       isSponsored: json['is_sponsored'] ?? false,
       isVerified: json['is_verified'] ?? false,
       rank: (json['rank'] ?? 0.0).toDouble(),
+      isBounty: json['is_bounty'] ?? false,
     );
   }
   
@@ -91,10 +96,11 @@ class MarketplaceProduct {
     'is_sponsored': isSponsored,
     'is_verified': isVerified,
     'rank': rank,
+    'is_bounty': isBounty,
   };
 }
 
-/// Bounty for unverified entities (users can earn by verifying)
+/// Bounty for unverified entities (Cold Start Protocol)
 class VerificationBounty {
   final String entityLabel;
   final String entityId;
@@ -103,6 +109,8 @@ class VerificationBounty {
   final DateTime expiresAt;
   final int verificationsNeeded;
   final int currentVerifications;
+  final String? sponsorName;           // Vendor sponsoring the bounty
+  final String? sponsorDid;
   
   VerificationBounty({
     required this.entityLabel,
@@ -112,21 +120,27 @@ class VerificationBounty {
     required this.expiresAt,
     required this.verificationsNeeded,
     required this.currentVerifications,
+    this.sponsorName,
+    this.sponsorDid,
   });
   
   String get formattedReward => '₹$rewardInr';
   double get progress => currentVerifications / verificationsNeeded;
   bool get isComplete => currentVerifications >= verificationsNeeded;
+  bool get isHighValue => rewardInr >= 100;
   
   factory VerificationBounty.fromJson(Map<String, dynamic> json) {
     return VerificationBounty(
       entityLabel: json['entity_label'] ?? '',
       entityId: json['entity_id'] ?? '',
       rewardInr: json['reward_inr'] ?? 0,
-      requirement: json['requirement'] ?? 'Take a photo of this item',
-      expiresAt: DateTime.tryParse(json['expires_at'] ?? '') ?? DateTime.now().add(const Duration(days: 7)),
+      requirement: json['requirement'] ?? 'Take a verification photo',
+      expiresAt: DateTime.tryParse(json['expires_at'] ?? '') ?? 
+                 DateTime.now().add(const Duration(days: 7)),
       verificationsNeeded: json['verifications_needed'] ?? 10,
       currentVerifications: json['current_verifications'] ?? 0,
+      sponsorName: json['sponsor_name'],
+      sponsorDid: json['sponsor_did'],
     );
   }
 }
@@ -138,6 +152,7 @@ class ProductFetchResult {
   final List<VerificationBounty> bounties;   // Available bounties
   final bool fromCache;
   final String? error;
+  final bool isColdStart;                    // No results, bounty opportunity
   
   ProductFetchResult({
     required this.verified,
@@ -145,6 +160,7 @@ class ProductFetchResult {
     required this.bounties,
     this.fromCache = false,
     this.error,
+    this.isColdStart = false,
   });
   
   bool get hasError => error != null;
@@ -162,9 +178,16 @@ class CommerceService {
   
   // Backend API endpoint (Phase 14)
   static const String _searchEndpoint = 'http://localhost:9000/v1/search';
+  static const String _bountyEndpoint = 'http://localhost:9000/v1/bounties';
+  
+  // Use mock data when backend is unavailable
+  bool _useMockData = false;
   
   // Cache duration (1 hour)
   static const Duration _cacheDuration = Duration(hours: 1);
+  
+  // Trust graph cache
+  List<String> _trustedVendors = [];
   
   StreamSubscription<SatyaEvent>? _objectSelectedSubscription;
   
@@ -172,9 +195,18 @@ class CommerceService {
   final _productsController = StreamController<ProductFetchResult>.broadcast();
   Stream<ProductFetchResult> get productsStream => _productsController.stream;
   
+  /// Enable mock data mode for development
+  void enableMockData() {
+    _useMockData = true;
+    debugPrint('flutter: SATYA_DEBUG: [COMMERCE] Mock data mode enabled');
+  }
+  
   /// Initialize the commerce service
-  void initialize() {
+  Future<void> initialize() async {
     debugPrint('flutter: SATYA_DEBUG: [COMMERCE] Initializing service...');
+    
+    // Load trust graph from database
+    await _loadTrustGraph();
     
     // Listen to object selection events
     _objectSelectedSubscription = _eventBus.on(SatyaEventType.objectSelected).listen((event) {
@@ -184,11 +216,31 @@ class CommerceService {
       }
     });
     
+    // Check backend health
+    try {
+      await http.get(Uri.parse('http://localhost:9000/health'))
+          .timeout(const Duration(seconds: 2));
+      debugPrint('flutter: SATYA_DEBUG: [COMMERCE] Backend connected');
+    } catch (e) {
+      debugPrint('flutter: SATYA_DEBUG: [COMMERCE] Backend unavailable, using mock data');
+      _useMockData = true;
+    }
+    
     debugPrint('flutter: SATYA_DEBUG: [COMMERCE] Service initialized');
   }
   
+  /// Load trusted vendors from local database
+  Future<void> _loadTrustGraph() async {
+    final entities = await _db.getTrustGraph(limit: 100);
+    _trustedVendors = entities
+        .where((e) => e.trustScore >= 0.7)
+        .map((e) => e.id)
+        .toList();
+    debugPrint('flutter: SATYA_DEBUG: [COMMERCE] Loaded ${_trustedVendors.length} trusted vendors');
+  }
+  
   /// Fetch products for a detected object label
-  /// Implements local-first strategy: check cache first, then fetch from network
+  /// Implements local-first strategy with Cold Start Bounty Protocol
   Future<ProductFetchResult> fetchProducts(String label) async {
     debugPrint('flutter: SATYA_DEBUG: [COMMERCE] Fetching products for: $label');
     
@@ -202,26 +254,27 @@ class CommerceService {
         final result = _processProducts(cachedProducts, label, fromCache: true);
         _productsController.add(result);
         
-        // Refresh in background if cache is getting stale
+        // Refresh in background
         _refreshInBackground(label);
         
         return result;
       }
       
-      // Step 2: Fetch from network
+      // Step 2: Use mock data if enabled
+      if (_useMockData) {
+        return await _fetchMockProducts(label);
+      }
+      
+      // Step 3: Fetch from network
       return await _fetchFromNetwork(label);
       
     } catch (e) {
       debugPrint('flutter: SATYA_DEBUG: [COMMERCE] Error: $e');
       
-      final errorResult = ProductFetchResult(
-        verified: [],
-        global: [],
-        bounties: [_createDefaultBounty(label)],
-        error: e.toString(),
-      );
-      _productsController.add(errorResult);
-      return errorResult;
+      // Cold Start Protocol: Return bounty opportunity
+      final coldStartResult = _createColdStartResult(label);
+      _productsController.add(coldStartResult);
+      return coldStartResult;
     }
   }
   
@@ -247,13 +300,177 @@ class CommerceService {
     
     // Split into verified (trust >= 0.7) and global
     final verified = ranked.where((p) => p.trustScore >= 0.7).toList();
-    final global = ranked;
+    
+    // Check if Cold Start applies
+    final isColdStart = ranked.isEmpty;
     
     return ProductFetchResult(
       verified: verified,
-      global: global,
-      bounties: [_createDefaultBounty(label)],
+      global: ranked,
+      bounties: isColdStart ? [_createDefaultBounty(label)] : [],
       fromCache: fromCache,
+      isColdStart: isColdStart,
+    );
+  }
+  
+  /// Fetch mock products for development
+  Future<ProductFetchResult> _fetchMockProducts(String label) async {
+    debugPrint('flutter: SATYA_DEBUG: [COMMERCE] Generating mock products for: $label');
+    
+    // Simulate network delay
+    await Future.delayed(const Duration(milliseconds: 500));
+    
+    final mockProducts = _generateMockProducts(label);
+    final ranked = _rankProducts(mockProducts);
+    
+    final verified = ranked.where((p) => p.isVerified || p.trustScore >= 0.7).toList();
+    
+    // Check for Cold Start condition
+    final isColdStart = ranked.isEmpty || label.toLowerCase().contains('unknown');
+    
+    final result = ProductFetchResult(
+      verified: verified,
+      global: ranked,
+      bounties: _generateMockBounties(label),
+      fromCache: false,
+      isColdStart: isColdStart,
+    );
+    
+    _productsController.add(result);
+    debugPrint('flutter: SATYA_DEBUG: [COMMERCE] Mock: ${ranked.length} products, ${result.bounties.length} bounties');
+    return result;
+  }
+  
+  /// Generate mock product data
+  List<MarketplaceProduct> _generateMockProducts(String label) {
+    final normalizedLabel = label.toUpperCase();
+    
+    // Generate different products based on category
+    return [
+      // Sponsored product (high bid)
+      MarketplaceProduct(
+        productId: 'mock_${label}_001',
+        title: '$normalizedLabel - Premium Quality',
+        description: 'Verified authentic product with warranty',
+        vendorDid: 'did:satya:vendor_premium_001',
+        vendorName: 'TrustMart Premium',
+        priceInr: 2999,
+        imageUrl: null,
+        trustScore: 0.92,
+        bid: 15.0,
+        isSponsored: true,
+        isVerified: true,
+        rank: 0.0,
+      ),
+      // Verified product
+      MarketplaceProduct(
+        productId: 'mock_${label}_002',
+        title: '$normalizedLabel - Standard',
+        description: 'GST verified seller',
+        vendorDid: 'did:satya:vendor_standard_001',
+        vendorName: 'LocalShop India',
+        priceInr: 1499,
+        imageUrl: null,
+        trustScore: 0.75,
+        bid: null,
+        isSponsored: false,
+        isVerified: true,
+        rank: 0.0,
+      ),
+      // Mid-tier product
+      MarketplaceProduct(
+        productId: 'mock_${label}_003',
+        title: '$normalizedLabel - Value Pack',
+        description: 'Good reviews, new seller',
+        vendorDid: 'did:satya:vendor_new_001',
+        vendorName: 'NewBiz Goods',
+        priceInr: 999,
+        imageUrl: null,
+        trustScore: 0.55,
+        bid: 5.0,
+        isSponsored: true,
+        isVerified: false,
+        rank: 0.0,
+      ),
+      // Low trust product
+      MarketplaceProduct(
+        productId: 'mock_${label}_004',
+        title: '$normalizedLabel - Budget Option',
+        description: 'Unverified seller',
+        vendorDid: 'did:satya:vendor_budget_001',
+        vendorName: 'QuickSell',
+        priceInr: 499,
+        imageUrl: null,
+        trustScore: 0.35,
+        bid: null,
+        isSponsored: false,
+        isVerified: false,
+        rank: 0.0,
+      ),
+      // Cold Start bounty product
+      MarketplaceProduct(
+        productId: 'mock_${label}_005',
+        title: '$normalizedLabel - Help Verify!',
+        description: 'New listing needs verification',
+        vendorDid: 'did:satya:vendor_new_002',
+        vendorName: 'Unknown Seller',
+        priceInr: 799,
+        imageUrl: null,
+        trustScore: 0.1,
+        bid: null,
+        isSponsored: false,
+        isVerified: false,
+        rank: 0.0,
+        isBounty: true,
+      ),
+    ];
+  }
+  
+  /// Generate mock bounties (Cold Start Protocol)
+  List<VerificationBounty> _generateMockBounties(String label) {
+    return [
+      VerificationBounty(
+        entityLabel: label,
+        entityId: 'bounty_${label.toLowerCase().replaceAll(' ', '_')}',
+        rewardInr: 50,
+        requirement: 'Take a photo and rate authenticity',
+        expiresAt: DateTime.now().add(const Duration(days: 7)),
+        verificationsNeeded: 10,
+        currentVerifications: 3,
+        sponsorName: 'SatyaSetu Community',
+      ),
+      VerificationBounty(
+        entityLabel: '$label Quality Check',
+        entityId: 'bounty_${label.toLowerCase()}_quality',
+        rewardInr: 100,
+        requirement: 'Verify product quality and condition',
+        expiresAt: DateTime.now().add(const Duration(days: 5)),
+        verificationsNeeded: 5,
+        currentVerifications: 1,
+        sponsorName: 'TrustMart Premium',
+        sponsorDid: 'did:satya:vendor_premium_001',
+      ),
+    ];
+  }
+  
+  /// Create Cold Start result with bounty opportunity
+  ProductFetchResult _createColdStartResult(String label) {
+    return ProductFetchResult(
+      verified: [],
+      global: [],
+      bounties: [
+        VerificationBounty(
+          entityLabel: label,
+          entityId: 'coldstart_${DateTime.now().millisecondsSinceEpoch}',
+          rewardInr: 75,  // Higher reward for cold start
+          requirement: 'Be the first to verify this item! Take photos and confirm authenticity.',
+          expiresAt: DateTime.now().add(const Duration(days: 14)),
+          verificationsNeeded: 5,
+          currentVerifications: 0,
+          sponsorName: 'SatyaSetu Cold Start Fund',
+        ),
+      ],
+      isColdStart: true,
     );
   }
   
@@ -268,14 +485,17 @@ class CommerceService {
         body: jsonEncode({
           'query': label,
           'limit': 20,
+          'user_trust_graph': _trustedVendors,
         }),
       ).timeout(const Duration(seconds: 10));
       
       if (response.statusCode == 200) {
-        final List<dynamic> data = jsonDecode(response.body);
+        final data = jsonDecode(response.body);
         
-        // Parse products
-        final products = data.map((json) => MarketplaceProduct.fromJson(json)).toList();
+        // Parse products from response
+        final List<dynamic> results = data['results'] ?? [];
+        final products = results.map((json) => 
+            MarketplaceProduct.fromJson(json)).toList();
         
         // Apply ranking
         final ranked = _rankProducts(products);
@@ -283,13 +503,17 @@ class CommerceService {
         // Cache results
         await _cacheProducts(label, ranked);
         
+        // Fetch bounties
+        final bounties = await _fetchBounties(label);
+        
         // Split into categories
         final verified = ranked.where((p) => p.trustScore >= 0.7).toList();
         
         final result = ProductFetchResult(
           verified: verified,
           global: ranked,
-          bounties: ranked.isEmpty ? [_createDefaultBounty(label)] : [],
+          bounties: ranked.isEmpty ? bounties : [],
+          isColdStart: ranked.isEmpty,
         );
         
         _productsController.add(result);
@@ -301,24 +525,42 @@ class CommerceService {
     } catch (e) {
       debugPrint('flutter: SATYA_DEBUG: [COMMERCE] Network fetch failed: $e');
       
-      // Return empty results with bounty opportunity
-      final result = ProductFetchResult(
-        verified: [],
-        global: [],
-        bounties: [_createDefaultBounty(label)],
-        error: e.toString(),
-      );
+      // Fall back to mock data
+      if (!_useMockData) {
+        _useMockData = true;
+        return await _fetchMockProducts(label);
+      }
       
-      _productsController.add(result);
-      return result;
+      return _createColdStartResult(label);
     }
+  }
+  
+  /// Fetch bounties from backend
+  Future<List<VerificationBounty>> _fetchBounties(String label) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$_bountyEndpoint?entity_label=$label'),
+      ).timeout(const Duration(seconds: 5));
+      
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        return data.map((json) => VerificationBounty.fromJson(json)).toList();
+      }
+    } catch (e) {
+      debugPrint('flutter: SATYA_DEBUG: [COMMERCE] Bounty fetch failed: $e');
+    }
+    
+    return [_createDefaultBounty(label)];
   }
   
   /// Refresh products in background (non-blocking)
   Future<void> _refreshInBackground(String label) async {
-    // Delay to avoid hitting API immediately after cache hit
     await Future.delayed(const Duration(seconds: 2));
-    await _fetchFromNetwork(label);
+    if (_useMockData) {
+      await _fetchMockProducts(label);
+    } else {
+      await _fetchFromNetwork(label);
+    }
   }
   
   /// Cache products in local database
@@ -344,7 +586,10 @@ class CommerceService {
     return products.map((p) {
       // Calculate rank score
       final bidComponent = (p.bid ?? 0.0) * p.trustScore;
-      final organicComponent = _calculateOrganicRelevance(p) * _getSocialProximity(p.vendorDid);
+      final organicRelevance = _calculateOrganicRelevance(p);
+      final socialProximity = _getSocialProximity(p.vendorDid);
+      final organicComponent = organicRelevance * socialProximity;
+      
       final totalScore = bidComponent + organicComponent;
       
       return MarketplaceProduct(
@@ -360,6 +605,7 @@ class CommerceService {
         isSponsored: p.isSponsored,
         isVerified: p.isVerified,
         rank: totalScore,
+        isBounty: p.isBounty,
       );
     }).toList()
       ..sort((a, b) => b.rank.compareTo(a.rank));
@@ -369,30 +615,41 @@ class CommerceService {
   double _calculateOrganicRelevance(MarketplaceProduct p) {
     double score = 0.5; // Base score
     
-    if (p.isVerified) score += 0.2;
+    if (p.isVerified) score += 0.25;
     if (p.imageUrl != null) score += 0.1;
     if (p.description != null && p.description!.length > 50) score += 0.1;
+    if (p.trustScore >= 0.7) score += 0.15;
     
     return score.clamp(0.0, 1.0);
   }
   
-  /// Get social proximity (how close is this vendor to user's trust network)
-  /// TODO: Implement based on actual trust graph in Phase 13
+  /// Get social proximity (how close vendor is to user's trust network)
   double _getSocialProximity(String vendorDid) {
-    // Placeholder - in full implementation, query trust graph for connections
-    return 0.5;
+    // Check if vendor is in user's trusted list
+    if (_trustedVendors.contains(vendorDid)) {
+      return 1.0;  // Full proximity
+    }
+    
+    // Check for partial matches (same vendor prefix)
+    final vendorPrefix = vendorDid.split(':').take(3).join(':');
+    if (_trustedVendors.any((v) => v.startsWith(vendorPrefix))) {
+      return 0.75;  // Related vendor
+    }
+    
+    return 0.5;  // Unknown vendor
   }
   
-  /// Create a default bounty for a new/unknown entity
+  /// Create a default bounty for a new/unknown entity (Cold Start)
   VerificationBounty _createDefaultBounty(String label) {
     return VerificationBounty(
       entityLabel: label,
       entityId: 'bounty_${label.toLowerCase().replaceAll(' ', '_')}',
-      rewardInr: 50, // ₹50 reward for verification
-      requirement: 'Help verify this item by taking photos and rating authenticity',
+      rewardInr: 50,
+      requirement: 'Help build the trust network! Verify this item with photos and ratings.',
       expiresAt: DateTime.now().add(const Duration(days: 7)),
       verificationsNeeded: 10,
       currentVerifications: 0,
+      sponsorName: 'SatyaSetu Community Fund',
     );
   }
   

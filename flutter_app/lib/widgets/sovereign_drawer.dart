@@ -725,6 +725,382 @@ class _TabButton extends StatelessWidget {
   }
 }
 
+/// Sovereign Ad Card - Premium display for sponsored products
+class SovereignAdCard extends StatelessWidget {
+  final MarketplaceProduct product;
+  final VoidCallback? onTap;
+  
+  const SovereignAdCard({
+    super.key,
+    required this.product,
+    this.onTap,
+  });
+  
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              TrustColors.promoted.withOpacity(0.15),
+              TrustColors.promoted.withOpacity(0.05),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: TrustColors.promoted.withOpacity(0.5),
+            width: 1.5,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: TrustColors.promoted.withOpacity(0.2),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Sponsored Header
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: TrustColors.promoted.withOpacity(0.2),
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(LucideIcons.sparkles, color: TrustColors.promoted, size: 14),
+                  const SizedBox(width: 6),
+                  const Text(
+                    'PROMOTED',
+                    style: TextStyle(
+                      color: TrustColors.promoted,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 10,
+                      letterSpacing: 1.5,
+                    ),
+                  ),
+                  const Spacer(),
+                  if (product.bid != null)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: TrustColors.promoted.withOpacity(0.3),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        '★ ${product.bid!.toStringAsFixed(0)}',
+                        style: const TextStyle(
+                          color: TrustColors.promoted,
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            
+            // Product Content
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Row(
+                children: [
+                  // Product Image
+                  Container(
+                    width: 64,
+                    height: 64,
+                    decoration: BoxDecoration(
+                      color: Colors.white10,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: TrustColors.promoted.withOpacity(0.3)),
+                      image: product.imageUrl != null
+                          ? DecorationImage(
+                              image: NetworkImage(product.imageUrl!),
+                              fit: BoxFit.cover,
+                            )
+                          : null,
+                    ),
+                    child: product.imageUrl == null
+                        ? const Icon(LucideIcons.package, color: TrustColors.promoted, size: 28)
+                        : null,
+                  ),
+                  
+                  const SizedBox(width: 12),
+                  
+                  // Product Info
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            if (product.isVerified)
+                              Padding(
+                                padding: const EdgeInsets.only(right: 6),
+                                child: Icon(
+                                  LucideIcons.badgeCheck,
+                                  color: TrustColors.trusted,
+                                  size: 16,
+                                ),
+                              ),
+                            Expanded(
+                              child: Text(
+                                product.title,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                        if (product.vendorName != null)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 2),
+                            child: Text(
+                              product.vendorName!,
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.6),
+                                fontSize: 11,
+                              ),
+                            ),
+                          ),
+                        const SizedBox(height: 6),
+                        Row(
+                          children: [
+                            Text(
+                              product.formattedPrice,
+                              style: const TextStyle(
+                                color: TrustColors.promoted,
+                                fontWeight: FontWeight.w900,
+                                fontSize: 18,
+                              ),
+                            ),
+                            const Spacer(),
+                            // Trust Badge
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: TrustColors.forScore(product.trustScore).withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(
+                                  color: TrustColors.forScore(product.trustScore).withOpacity(0.5),
+                                ),
+                              ),
+                              child: Text(
+                                product.trustBadge,
+                                style: TextStyle(
+                                  color: TrustColors.forScore(product.trustScore),
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Bounty Card - Display for verification bounties (Cold Start Protocol)
+class BountyCard extends StatelessWidget {
+  final VerificationBounty bounty;
+  final VoidCallback? onClaim;
+  
+  const BountyCard({
+    super.key,
+    required this.bounty,
+    this.onClaim,
+  });
+  
+  @override
+  Widget build(BuildContext context) {
+    final isHighValue = bounty.rewardInr >= 100;
+    
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            TrustColors.bounty.withOpacity(isHighValue ? 0.2 : 0.1),
+            TrustColors.bounty.withOpacity(0.05),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: TrustColors.bounty.withOpacity(isHighValue ? 0.7 : 0.4),
+          width: isHighValue ? 2 : 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header Row
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: TrustColors.bounty.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  isHighValue ? LucideIcons.trophy : LucideIcons.gift,
+                  color: TrustColors.bounty,
+                  size: 22,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          isHighValue ? 'HIGH VALUE BOUNTY' : 'VERIFICATION BOUNTY',
+                          style: TextStyle(
+                            color: TrustColors.bounty,
+                            fontWeight: FontWeight.bold,
+                            fontSize: isHighValue ? 11 : 10,
+                            letterSpacing: 1,
+                          ),
+                        ),
+                        if (isHighValue) ...[
+                          const SizedBox(width: 6),
+                          const Icon(LucideIcons.flame, color: Colors.orange, size: 12),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      bounty.entityLabel,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              // Reward
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: TrustColors.bounty,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  bounty.formattedReward,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          
+          const SizedBox(height: 12),
+          
+          // Requirement
+          Text(
+            bounty.requirement,
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.7),
+              fontSize: 12,
+            ),
+          ),
+          
+          const SizedBox(height: 12),
+          
+          // Progress Bar
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: bounty.progress,
+              backgroundColor: Colors.white10,
+              valueColor: AlwaysStoppedAnimation(
+                bounty.isComplete ? TrustColors.trusted : TrustColors.bounty,
+              ),
+              minHeight: 6,
+            ),
+          ),
+          
+          const SizedBox(height: 6),
+          
+          // Progress Text & Claim Button
+          Row(
+            children: [
+              Text(
+                '${bounty.currentVerifications}/${bounty.verificationsNeeded} verifications',
+                style: const TextStyle(
+                  color: Colors.white38,
+                  fontSize: 10,
+                ),
+              ),
+              const Spacer(),
+              if (onClaim != null)
+                TextButton(
+                  onPressed: onClaim,
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    backgroundColor: TrustColors.bounty.withOpacity(0.2),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: const [
+                      Icon(LucideIcons.camera, size: 12, color: TrustColors.bounty),
+                      SizedBox(width: 4),
+                      Text(
+                        'CLAIM',
+                        style: TextStyle(
+                          color: TrustColors.bounty,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 10,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _ProductCard extends StatelessWidget {
   final MarketplaceProduct product;
   
