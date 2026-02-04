@@ -1,9 +1,10 @@
 /**
  * FILE: flutter_app/lib/services/intent_engine.dart
- * VERSION: 9.0.0 - Interaction Lifecycle Engine
+ * VERSION: 10.0.0 - Semantic Matching Engine
  * AUTHOR: SatyaSetu Principal Engineer
  * DESCRIPTION: Complete affordance management with:
- * - 50+ local templates (zero API calls for common objects)
+ * - 100+ local templates (zero API calls for common objects)
+ * - TIER 2: Semantic matching for unknown objects
  * - Session-aware Gemini API with strict limits
  * - Activity session tracking
  * - DID-ready rating flow
@@ -14,6 +15,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../models/intent_models.dart';
 import '../secrets.dart';
+import 'semantic_matcher.dart';
 
 class IntentEngine {
   // ============================================================================
@@ -26,6 +28,16 @@ class IntentEngine {
   static final Map<String, ApeResponse> _affordanceCache = {};
   static int _apiCallCount = 0;
   static ActivitySession? _currentSession;
+  static bool _semanticInitialized = false;
+  
+  /// Initialize semantic matcher (call once at app start)
+  static Future<void> initializeSemanticMatcher() async {
+    if (!_semanticInitialized) {
+      await SemanticMatcher.instance.initialize();
+      _semanticInitialized = true;
+      debugPrint("INTENT_ENGINE: Semantic matcher initialized with ${SemanticMatcher.instance.categoryCount} categories");
+    }
+  }
   
   // ============================================================================
   // PUBLIC API
@@ -118,6 +130,10 @@ class IntentEngine {
   static String _getCategory(String label) {
     final l = label.toUpperCase();
     
+    // =========================================================================
+    // TIER 1: Fast Keyword Matching (instant, 0 cost)
+    // =========================================================================
+    
     // People
     if (l.contains("PERSON") || l.contains("FACE") || l.contains("MAN") || l.contains("WOMAN") || l.contains("CHILD")) return "PERSON";
     
@@ -133,10 +149,11 @@ class IntentEngine {
     if (l.contains("SHOE") || l.contains("SNEAKER") || l.contains("BOOT")) return "FOOTWEAR";
     
     // Electronics
-    if (l.contains("PHONE") || l.contains("MOBILE")) return "PHONE";
-    if (l.contains("LAPTOP") || l.contains("COMPUTER")) return "COMPUTER";
-    if (l.contains("TABLET") || l.contains("IPAD")) return "TABLET";
-    if (l.contains("HEADPHONE") || l.contains("EARPHONE") || l.contains("AIRPOD")) return "AUDIO";
+    if (l.contains("PHONE") || l.contains("MOBILE") || l.contains("IPHONE") || l.contains("ANDROID")) return "PHONE";
+    if (l.contains("LAPTOP") || l.contains("COMPUTER") || l.contains("MACBOOK") || l.contains("THINKPAD")) return "COMPUTER";
+    if (l.contains("TABLET") || l.contains("IPAD") || l.contains("KINDLE")) return "TABLET";
+    if (l.contains("HEADPHONE") || l.contains("EARPHONE") || l.contains("AIRPOD") || l.contains("EARBUD")) return "HEADPHONES";
+    if (l.contains("SMARTWATCH") || l.contains("APPLE WATCH") || l.contains("FITBIT")) return "SMARTWATCH";
     
     // Stationery/Office
     if (l.contains("NOTEBOOK") || l.contains("BOOK") || l.contains("DIARY")) return "NOTEBOOK";
@@ -147,6 +164,7 @@ class IntentEngine {
     if (l.contains("CHAIR") || l.contains("SEAT")) return "CHAIR";
     if (l.contains("TABLE") || l.contains("DESK")) return "TABLE";
     if (l.contains("BED") || l.contains("MATTRESS")) return "BED";
+    if (l.contains("SOFA") || l.contains("COUCH")) return "SOFA";
     if (l.contains("CURTAIN") || l.contains("WINDOW") || l.contains("BLIND")) return "WINDOW";
     
     // Kitchen/Food
@@ -155,12 +173,26 @@ class IntentEngine {
     if (l.contains("FOOD") || l.contains("FRUIT") || l.contains("VEGETABLE") || l.contains("MEAL")) return "FOOD";
     
     // Vehicles
-    if (l.contains("CAR") || l.contains("VEHICLE") || l.contains("AUTO")) return "VEHICLE";
+    if (l.contains("CAR") || l.contains("VEHICLE") || l.contains("AUTO") || l.contains("SEDAN") || l.contains("SUV")) return "VEHICLE";
     if (l.contains("BIKE") || l.contains("BICYCLE") || l.contains("CYCLE")) return "BICYCLE";
+    if (l.contains("MOTORCYCLE") || l.contains("SCOOTER")) return "MOTORCYCLE";
     
     // Others
     if (l.contains("BAG") || l.contains("PURSE") || l.contains("BACKPACK")) return "BAG";
     if (l.contains("PLANT") || l.contains("FLOWER") || l.contains("TREE")) return "PLANT";
+    if (l.contains("TOY") || l.contains("GAME")) return "TOY";
+    if (l.contains("MEDICINE") || l.contains("PILL") || l.contains("TABLET") && l.contains("MED")) return "MEDICINE";
+    
+    // =========================================================================
+    // TIER 2: Semantic Matching (100ms, 0 cost)
+    // =========================================================================
+    if (_semanticInitialized) {
+      final semanticMatch = SemanticMatcher.instance.matchCategory(label, threshold: 0.6);
+      if (semanticMatch.confidence > 0.5) {
+        debugPrint("TIER2_SEMANTIC_HIT: $label → ${semanticMatch.category} (${semanticMatch.confidence.toStringAsFixed(2)})");
+        return semanticMatch.category;
+      }
+    }
     
     return "OBJECT";
   }

@@ -2,6 +2,7 @@
 pub mod api;
 pub mod crypto;
 pub mod domain;
+pub mod embeddings; /* [NEW] Semantic matching module */
 pub mod parser;
 pub mod persistence;
 pub mod telemetry;

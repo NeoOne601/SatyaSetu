@@ -29,3 +29,5 @@ vision_config.json
 yolov8s-worldv2.pt
 *.safetensors
 *.bin
+# Confidential documents
+SATYASETU_VISION_DOCUMENT.md

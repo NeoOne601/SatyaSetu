@@ -4,8 +4,8 @@
 
 **A privacy-first, decentralized spatial marketplace that transforms your camera into a Trust Sensor for discovering, verifying, and transacting with physical objects and vendors in your environment.**
 
-![Version](https://img.shields.io/badge/version-1.15.0-blue)
-![Phase](https://img.shields.io/badge/phase-Phase%2015-green)
+![Version](https://img.shields.io/badge/version-1.16.0-blue)
+![Phase](https://img.shields.io/badge/phase-Phase%2016-green)
 ![Platform](https://img.shields.io/badge/platform-iOS%20%7C%20Android%20%7C%20macOS-lightgrey)
 ![License](https://img.shields.io/badge/license-Private-red)
 
@@ -55,9 +55,11 @@ Verify/Report → Nostr Broadcast → Trust Score Update
 | `commerce_service.dart` | Marketplace logic with Sovereign Ad Logic |
 | `nostr_service.dart` | High-level Nostr event signing/broadcast |
 | `sovereign_drawer.dart` | Reactive Drawer commerce UI |
+| `semantic_matcher.dart` | Vector embeddings for semantic category matching |
 | `docker-compose.yml` | PostgreSQL + Redis + FastAPI infrastructure |
 | `backend/db/init.sql` | Database schema with ranking functions |
 | `backend/search_api/main.py` | FastAPI search microservice |
+| `scripts/generate_category_embeddings.py` | Offline embedding generator |
 
 ---
 
@@ -261,6 +263,25 @@ Score = (Bid × AdvertiserTrust) + (OrganicRelevance × SocialProximity)
 - **Cryptographic Signing**: Ed25519 signature over transaction data
 - **Nostr Broadcasting**: Signed proofs published to decentralized relays
 
+### 8. **Semantic Matching Engine** (Phase 16 - NEW)
+
+- **3-Tier Category Detection**: Keyword → Semantic Embeddings → Fallback
+- **100+ Categories**: Electronics, clothing, furniture, vehicles, medical, and more
+- **Zero-Cost Matching**: All matching happens locally with pre-computed embeddings
+- **Rust FFI Integration**: Cosine similarity computation in native code
+- **Extensible**: Easy to add new categories via embedding generation script
+
+**Matching Flow:**
+```
+Label: "MacBook Pro 16 inch"
+    ↓
+TIER 1: Keyword check → "MACBOOK" matches → Return "COMPUTER" ✓
+    ↓ (if no match)
+TIER 2: Semantic similarity with 100+ category embeddings
+    ↓ (if confidence < 0.5)
+TIER 3: Fallback to "OBJECT"
+```
+
 ---
 
 ## 🛠️ Technology Stack
@@ -330,7 +351,8 @@ SatyaSetu_Internal/
 │   │   │   ├── event_bus.dart                # Pub/sub communication (NEW)
 │   │   │   ├── commerce_service.dart         # Marketplace logic (NEW)
 │   │   │   ├── nostr_service.dart            # Nostr event handling (NEW)
-│   │   │   ├── intent_engine.dart            # Dual-tier interaction paradigm
+│   │   │   ├── intent_engine.dart            # Dual-tier + semantic matching (v10.0)
+│   │   │   ├── semantic_matcher.dart         # Vector embeddings service (NEW)
 │   │   │   ├── mission_control_service.dart  # System telemetry
 │   │   │   ├── intent_harvester.dart         # Cryptographic ledger
 │   │   │   ├── vault_service.dart            # Encrypted storage
@@ -340,6 +362,8 @@ SatyaSetu_Internal/
 │   │   └── models/
 │   │       ├── intent_models.dart            # MorphicAction, SituationState
 │   │       └── telemetry_models.dart         # SystemPulse, SystemHealth
+│   ├── assets/                    # Pre-computed embeddings (NEW)
+│   │   └── category_embeddings.json
 │   ├── ios/                       # iOS-specific configuration
 │   ├── android/                   # Android-specific configuration
 │   ├── macos/                     # macOS-specific configuration
@@ -354,6 +378,7 @@ SatyaSetu_Internal/
 │   │   ├── persistence.rs         # SQLite vault management
 │   │   ├── parser.rs              # UPI QR parsing logic
 │   │   ├── spatial.rs             # S2/Geohash indexing
+│   │   ├── embeddings.rs          # Cosine similarity for semantic matching (NEW)
 │   │   └── bridge_generated.rs    # Auto-generated FFI bridge
 │   └── Cargo.toml                 # Rust dependencies
 │
